@@ -1,23 +1,18 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { PrismaModule } from './prisma/prisma.module.js';
+import { DocgiaModule } from './docgia/docgia.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 @Module({
   imports: [
-     TypeOrmModule.forRoot({
-      type: 'mysql',
-      host: 'localhost',
-      port: 3306,
-      username: 'root',
-      password: '',
-      database: 'test',
-      entities: [],
-      synchronize: true,
-    }),
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    DocgiaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

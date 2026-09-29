@@ -31,6 +31,20 @@
 $ npm install
 ```
 
+## Prisma and MySQL
+
+Copy `.env.example` to `.env`, then start the MySQL service defined in
+`docker-compose.yml`:
+
+```bash
+docker compose up -d db
+npm run prisma:pull
+npm run prisma:generate
+```
+
+`prisma:pull` reads the existing database schema into `prisma/schema.prisma`.
+Run it again after database changes, then regenerate the Prisma Client.
+
 ## Compile and run the project
 
 ```bash

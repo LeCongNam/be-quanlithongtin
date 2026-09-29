@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: mysql_container
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: mydatabase
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      # Mount file init.sql vào thư mục tự động chạy của container
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      # (Tùy chọn) Lưu trữ dữ liệu lâu dài không bị mất khi xóa container
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:
