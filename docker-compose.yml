@@ -7,8 +7,8 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: mydatabase
-      MYSQL_USER: root
+      MYSQL_DATABASE: qltv_nhom8
+      MYSQL_USER: qltt
       MYSQL_PASSWORD: root
     ports:
       - "3306:3306"
