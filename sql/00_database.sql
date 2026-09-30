@@ -1,0 +1,6 @@
+-- 00. DATABASE
+DROP DATABASE IF EXISTS qltv_nhom8;
+CREATE DATABASE qltv_nhom8
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
+USE qltv_nhom8;
