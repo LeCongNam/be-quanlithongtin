@@ -10,7 +10,8 @@ INSERT INTO tham_so (ma_tham_so, gia_tri, don_vi, mo_ta) VALUES
 ('PHAT_QUA_HAN_NGAY', 5000, 'VND/ngay', 'Tien phat qua han moi ngay'),
 ('PHAT_HU_HONG', 50000, 'VND/lan', 'Tien phat lam hu hong sach'),
 ('PHAT_MAT_SACH', 300000, 'VND/lan', 'Tien den mat sach toi thieu (lay muc cao hon giua tham so nay va gia bia)'),
-('SO_NGAY_GIU_DAT_TRUOC', 3, 'ngay', 'Thoi gian giu sach cho nguoi dat truoc');
+('SO_NGAY_GIU_DAT_TRUOC', 3, 'ngay', 'Thoi gian giu sach cho nguoi dat truoc'),
+('SO_GIO_PHIEN', 8, 'gio', 'Thoi han mot phien dang nhap cua ban doc');
 
 INSERT INTO the_loai (ma_the_loai, ten_the_loai, mo_ta) VALUES
 ('TL01','Công nghệ thông tin','Tài liệu CNTT'),

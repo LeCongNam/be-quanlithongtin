@@ -104,6 +104,10 @@ BEGIN
 END$$
 
 -- Xử lý các lượt giữ sách quá hạn: đánh dấu HET_HAN rồi giao bản sách cho người kế tiếp (hoặc trả về SAN_SANG).
+-- Gọi ở autocommit = 1 (như event): mỗi lượt là một transaction riêng, lượt lỗi được hoàn tác nguyên vẹn (không để
+-- HET_HAN mà bản sách kẹt DANG_GIU), các lượt sau vẫn được xử lý; cuối cùng báo lỗi nếu có lượt không xử lý được
+-- (event ghi lỗi vào error log). Gọi ở autocommit = 0: chạy trong transaction của bên gọi, lỗi thì ROLLBACK và dừng
+-- (xem quy ước transaction ở đầu 04_procedures.sql).
 DROP PROCEDURE IF EXISTS sp_cursor_het_han_dat_truoc$$
 CREATE PROCEDURE sp_cursor_het_han_dat_truoc()
 BEGIN
@@ -111,6 +115,11 @@ BEGIN
     DECLARE v_dt_id BIGINT;
     DECLARE v_nguoi_dung_id BIGINT;
     DECLARE v_ban_sach_id BIGINT;
+    DECLARE v_con_het_han INT;
+    DECLARE v_so_loi INT DEFAULT 0;
+    DECLARE v_loi_cuoi VARCHAR(128);
+    DECLARE v_thong_bao VARCHAR(128);
+    DECLARE v_tu_mo_tx BOOLEAN DEFAULT (@@autocommit = 1);
 
     DECLARE cur CURSOR FOR
         SELECT id, nguoi_dung_id, ban_sach_id
@@ -129,18 +138,53 @@ BEGIN
             LEAVE read_loop;
         END IF;
 
-        UPDATE dat_truoc SET trang_thai = 'HET_HAN' WHERE id = v_dt_id;
+        xu_ly: BEGIN
+            DECLARE EXIT HANDLER FOR SQLEXCEPTION
+            BEGIN
+                GET DIAGNOSTICS CONDITION 1 v_loi_cuoi = MESSAGE_TEXT;  -- đọc trước khi ROLLBACK xóa diagnostics
+                ROLLBACK;
+                IF NOT v_tu_mo_tx THEN
+                    RESIGNAL;
+                END IF;
+                SET v_so_loi = v_so_loi + 1;
+            END;
 
-        CALL sp_cap_phat_ban_sach(v_ban_sach_id);
+            IF v_tu_mo_tx THEN
+                START TRANSACTION;
+            END IF;
 
-        INSERT INTO nhat_ky_hanh_vi(nguoi_dung_id, loai_hanh_vi, doi_tuong, doi_tuong_id, mo_ta)
-        VALUES(v_nguoi_dung_id, 'HET_HAN_DAT_TRUOC', 'DAT_TRUOC', v_dt_id, 'Het han giu sach');
+            -- Đọc lại có khóa: từ lúc mở cursor tới giờ lượt này có thể đã được mượn (DA_NHAN) hoặc hủy.
+            SELECT COUNT(*) INTO v_con_het_han
+            FROM dat_truoc
+            WHERE id = v_dt_id
+              AND trang_thai = 'SAN_SANG_NHAN'
+              AND han_giu < NOW()
+            FOR UPDATE;
+
+            IF v_con_het_han = 1 THEN
+                UPDATE dat_truoc SET trang_thai = 'HET_HAN' WHERE id = v_dt_id;
+
+                CALL sp_cap_phat_ban_sach(v_ban_sach_id);
+
+                INSERT INTO nhat_ky_hanh_vi(nguoi_dung_id, loai_hanh_vi, doi_tuong, doi_tuong_id, mo_ta)
+                VALUES(v_nguoi_dung_id, 'HET_HAN_DAT_TRUOC', 'DAT_TRUOC', v_dt_id, 'Het han giu sach');
+            END IF;
+
+            IF v_tu_mo_tx THEN
+                COMMIT;
+            END IF;
+        END xu_ly;
 
         -- lệnh bên trong có thể làm bật NOT FOUND; chỉ FETCH mới quyết định kết thúc vòng lặp
         SET done = 0;
     END LOOP;
 
     CLOSE cur;
+
+    IF v_so_loi > 0 THEN
+        SET v_thong_bao = LEFT(CONCAT(v_so_loi, ' luot giu sach het han chua xu ly duoc: ', v_loi_cuoi), 128);
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_thong_bao;
+    END IF;
 END$$
 
 DELIMITER ;
@@ -158,3 +202,10 @@ CREATE EVENT ev_danh_dau_qua_han
 ON SCHEDULE EVERY 1 DAY
 STARTS (TIMESTAMP(CURRENT_DATE) + INTERVAL 1 DAY + INTERVAL 5 MINUTE)
 DO CALL sp_cursor_danh_dau_qua_han();
+
+-- Dọn phiên đăng nhập đã đăng xuất hoặc quá hạn (phiên quá hạn đã tự vô hiệu, xóa chỉ để bảng không phình ra)
+DROP EVENT IF EXISTS ev_don_phien_dang_nhap;
+CREATE EVENT ev_don_phien_dang_nhap
+ON SCHEDULE EVERY 1 DAY
+STARTS (TIMESTAMP(CURRENT_DATE) + INTERVAL 1 DAY + INTERVAL 10 MINUTE)
+DO DELETE FROM phien_dang_nhap WHERE da_dang_xuat = TRUE OR het_han < NOW();

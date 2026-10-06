@@ -150,4 +150,46 @@ BEGIN
     RETURN IF(fn_ly_do_khong_the_muon(p_nguoi_dung_id) IS NULL, 1, 0);
 END$$
 
+-- Mã người dùng của phiên đăng nhập còn hiệu lực, hoặc NULL (token sai, đã đăng xuất, hết hạn, người dùng/tài khoản
+-- không còn HOAT_DONG). Chỉ nhận token thật: mã người dùng thô hay chính giá trị băm lưu trong CSDL đều không hợp lệ.
+DROP FUNCTION IF EXISTS fn_nguoi_dung_tu_token$$
+CREATE FUNCTION fn_nguoi_dung_tu_token(p_token VARCHAR(128))
+RETURNS VARCHAR(20)
+NOT DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE v_ma VARCHAR(20);
+
+    IF p_token IS NULL OR CHAR_LENGTH(p_token) <> 64 THEN
+        RETURN NULL;
+    END IF;
+
+    SELECT nd.ma_nguoi_dung INTO v_ma
+    FROM phien_dang_nhap ph
+    JOIN nguoi_dung nd ON nd.id = ph.nguoi_dung_id
+    JOIN tai_khoan tk ON tk.nguoi_dung_id = nd.id
+    WHERE ph.token_hash = SHA2(p_token, 256)
+      AND ph.da_dang_xuat = FALSE
+      AND ph.het_han > NOW()
+      AND nd.trang_thai = 'HOAT_DONG'
+      AND tk.trang_thai = 'HOAT_DONG';
+
+    RETURN v_ma;
+END$$
+
+-- Escape ký tự đại diện của LIKE (\ % _) để từ khóa người dùng gõ vào được hiểu theo nghĩa đen.
+-- Dùng CHAR(92) thay cho '\\' để không phụ thuộc sql_mode NO_BACKSLASH_ESCAPES. Dấu \ phải được thay trước.
+DROP FUNCTION IF EXISTS fn_escape_like$$
+CREATE FUNCTION fn_escape_like(p_chuoi VARCHAR(255))
+RETURNS VARCHAR(765)
+DETERMINISTIC
+NO SQL
+BEGIN
+    DECLARE v_gach CHAR(1) DEFAULT CHAR(92 USING utf8mb4);
+
+    RETURN REPLACE(REPLACE(REPLACE(p_chuoi, v_gach, CONCAT(v_gach, v_gach)),
+                           '%', CONCAT(v_gach, '%')),
+                   '_', CONCAT(v_gach, '_'));
+END$$
+
 DELIMITER ;

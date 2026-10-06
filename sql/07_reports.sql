@@ -101,6 +101,66 @@ JOIN sach s ON s.id = bs.sach_id
 GROUP BY s.id, s.ma_sach, s.ten_sach
 ORDER BY so_luot_muon DESC, s.ma_sach;
 
+-- Thống kê tiền phạt theo tháng lập phiếu và loại phạt. Phiếu HUY (lập nhầm) không tính vào số phiếu/tiền, đếm riêng.
+CREATE OR REPLACE VIEW vw_thong_ke_tien_phat AS
+SELECT
+    DATE_FORMAT(pp.ngay_tao, '%Y-%m') AS thang,
+    pp.loai_phat,
+    SUM(pp.trang_thai <> 'HUY') AS so_phieu,
+    SUM(CASE WHEN pp.trang_thai <> 'HUY' THEN pp.so_tien ELSE 0 END) AS tong_tien,
+    SUM(CASE WHEN pp.trang_thai = 'DA_THANH_TOAN' THEN pp.so_tien ELSE 0 END) AS da_thanh_toan,
+    SUM(CASE WHEN pp.trang_thai = 'CHUA_THANH_TOAN' THEN pp.so_tien ELSE 0 END) AS chua_thanh_toan,
+    SUM(pp.trang_thai = 'HUY') AS so_phieu_huy
+FROM phieu_phat pp
+GROUP BY DATE_FORMAT(pp.ngay_tao, '%Y-%m'), pp.loai_phat;
+
+-- Lịch sử mượn: mọi lượt mượn (đang mượn có ngay_tra NULL, đã trả có ngay_tra và tinh_trang_tra)
+CREATE OR REPLACE VIEW vw_lich_su_muon AS
+SELECT
+    nd.ma_nguoi_dung,
+    nd.ho_ten,
+    p.ma_phieu,
+    bs.ma_ban_sach,
+    s.ma_sach,
+    s.ten_sach,
+    p.ngay_muon,
+    c.han_tra,
+    c.ngay_tra,
+    c.so_lan_gia_han,
+    c.tinh_trang_tra,
+    fn_so_ngay_qua_han(c.han_tra, c.ngay_tra) AS so_ngay_qua_han
+FROM ct_phieu_muon c
+JOIN phieu_muon p ON p.id = c.phieu_muon_id
+JOIN nguoi_dung nd ON nd.id = p.nguoi_dung_id
+JOIN ban_sach bs ON bs.id = c.ban_sach_id
+JOIN sach s ON s.id = bs.sach_id;
+
+-- Đặt trước: bản sách đang giữ (khi SAN_SANG_NHAN) và thứ tự trong hàng chờ (khi CHO_XU_LY). Thứ tự tính như
+-- sp_cap_phat_ban_sach chọn người: chỉ người đang HOAT_DONG, theo ngay_dat rồi id; người không hoạt động thì NULL.
+CREATE OR REPLACE VIEW vw_dat_truoc AS
+SELECT
+    nd.ma_nguoi_dung,
+    nd.ho_ten,
+    s.ma_sach,
+    s.ten_sach,
+    d.ngay_dat,
+    d.trang_thai,
+    bs.ma_ban_sach,
+    d.han_giu,
+    CASE WHEN d.trang_thai = 'CHO_XU_LY' AND nd.trang_thai = 'HOAT_DONG' THEN (
+        SELECT COUNT(*)
+        FROM dat_truoc d2
+        JOIN nguoi_dung n2 ON n2.id = d2.nguoi_dung_id
+        WHERE d2.sach_id = d.sach_id
+          AND d2.trang_thai = 'CHO_XU_LY'
+          AND n2.trang_thai = 'HOAT_DONG'
+          AND (d2.ngay_dat < d.ngay_dat OR (d2.ngay_dat = d.ngay_dat AND d2.id <= d.id))
+    ) END AS thu_tu_cho
+FROM dat_truoc d
+JOIN nguoi_dung nd ON nd.id = d.nguoi_dung_id
+JOIN sach s ON s.id = d.sach_id
+LEFT JOIN ban_sach bs ON bs.id = d.ban_sach_id;
+
 -- Tra cứu sách: có tác giả và số bản sẵn sàng
 CREATE OR REPLACE VIEW vw_tra_cuu_sach AS
 SELECT

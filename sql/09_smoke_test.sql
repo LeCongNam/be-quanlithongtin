@@ -1,11 +1,12 @@
 USE qltv_nhom8;
 
 -- 09. SMOKE TEST (không nằm trong 99_full_setup.sql; chạy sau khi dựng xong DB)
--- Phần A-C chỉ đọc. Phần D chạy kịch bản mượn/trả/đặt trước trong transaction rồi ROLLBACK,
--- nên chạy lại nhiều lần không làm đổi dữ liệu mẫu.
+-- Phần A-C chỉ đọc. Phần D chạy kịch bản mượn/trả/đặt trước với SET autocommit = 0 rồi ROLLBACK,
+-- nên chạy lại nhiều lần không làm đổi dữ liệu mẫu. Không thay bằng START TRANSACTION: procedure tự mở
+-- transaction sẽ ngầm COMMIT phần trước đó (xem quy ước transaction ở đầu 04_procedures.sql).
 -- Nếu công cụ (vd. TablePlus) cắt sai câu lệnh khi Import, hãy mở file này trong SQL Editor và Run All.
 
--- A. Số lượng dữ liệu và đối tượng (kỳ vọng: 14 bảng, 6 view, 7 function, 17 procedure, 12 trigger, 2 event)
+-- A. Số lượng dữ liệu và đối tượng (kỳ vọng: 15 bảng, 9 view, 9 function, 30 procedure, 12 trigger, 3 event)
 SELECT
     (SELECT COUNT(*) FROM information_schema.tables   WHERE table_schema = 'qltv_nhom8' AND table_type = 'BASE TABLE') AS so_bang,
     (SELECT COUNT(*) FROM information_schema.views    WHERE table_schema = 'qltv_nhom8') AS so_view,
@@ -26,7 +27,14 @@ SELECT * FROM vw_sach_dang_muon;
 SELECT * FROM vw_muon_qua_han;
 SELECT * FROM vw_nguoi_dung_vi_pham;
 SELECT * FROM vw_top_sach_muon_nhieu LIMIT 10;
-CALL sp_tra_cuu_sach('Tanenbaum', 'SV004');
+SELECT * FROM vw_thong_ke_tien_phat ORDER BY thang, loai_phat;
+SELECT * FROM vw_dat_truoc WHERE trang_thai IN ('CHO_XU_LY', 'SAN_SANG_NHAN') ORDER BY ma_sach, thu_tu_cho;  -- S004: SV001 thứ 1, GV002 thứ 2
+SELECT * FROM vw_lich_su_muon WHERE ma_nguoi_dung = 'SV001' ORDER BY ngay_muon DESC;   -- kỳ vọng 2 dòng: BS001 đang mượn, BS019 đã MAT
+CALL sp_tra_cuu_sach('Tanenbaum', 'SV004');   -- kỳ vọng 3 dòng: S006, S008, S015 (khớp theo tác giả)
+CALL sp_tra_cuu_sach('cơ sở', 'SV004');       -- kỳ vọng 2 dòng: S001, S002 (âm tiết 2 ký tự; không dấu 'co so' cũng vậy)
+CALL sp_tra_cuu_sach('IT', 'SV004');          -- kỳ vọng 3 dòng: S007, S011, S013 (từ ngắn; khớp chuỗi con nên S007 'Security' cũng ra)
+CALL sp_tra_cuu_sach('%', 'SV004');           -- kỳ vọng 0 dòng: % là ký tự thường, không phải ký tự đại diện
+CALL sp_tra_cuu_sach('', 'SV004');            -- kỳ vọng 0 dòng và không ghi nhật ký
 
 -- C. Function (kỳ vọng: 3 ngày; 15000; SV004 bị chặn vì giữ sách quá hạn; SV002 được mượn = NULL)
 SELECT fn_so_ngay_qua_han(DATE_SUB(CURDATE(), INTERVAL 3 DAY), CURDATE()) AS test_so_ngay_qua_han;
@@ -37,7 +45,7 @@ SELECT fn_ly_do_khong_the_muon((SELECT id FROM nguoi_dung WHERE ma_nguoi_dung = 
 CALL sp_cursor_thong_ke_muon_theo_nguoi_dung();
 
 -- D. Kịch bản nghiệp vụ (ROLLBACK ở cuối)
-START TRANSACTION;
+SET autocommit = 0;
 
 -- D1. Mượn -> gia hạn -> trả bình thường: phiếu tự chuyển HOAN_TAT (kỳ vọng DANG_MUON rồi HOAN_TAT)
 CALL sp_tao_phieu_muon('SV002', 'CB001', @ma_phieu);
@@ -92,7 +100,22 @@ SELECT trang_thai, ly_do FROM phieu_phat WHERE id = 6;                          
 UPDATE nguoi_dung SET trang_thai = 'TAM_KHOA' WHERE ma_nguoi_dung = 'SV003';
 SELECT trang_thai AS tai_khoan_sv003_sau_khi_khoa FROM tai_khoan WHERE ten_dang_nhap = 'sv003';  -- kỳ vọng KHOA
 
+-- D7. Bạn đọc SV002 đăng nhập, xem lịch sử mượn và lượt đặt trước, tự gia hạn BS003 (đang mượn, hạn còn 9 ngày)
+CALL sp_dang_nhap('sv002', 'SV002@Nhom8', @tok_sv002);
+CALL sp_bandoc_lich_su_muon(@tok_sv002);    -- kỳ vọng 3 dòng: phiếu D1 (BS002 đã trả), PM000002 (BS003), PM000011 (BS012)
+CALL sp_bandoc_ds_dat_truoc(@tok_sv002);    -- kỳ vọng 2 dòng: S008 SAN_SANG_NHAN giữ BS010 (D4), S006 CHO_XU_LY thứ 1
+CALL sp_bandoc_gia_han(@tok_sv002, 'BS003', 7);
+SELECT DATEDIFF(han_tra, CURDATE()) AS so_ngay_con_lai_bs003, so_lan_gia_han   -- kỳ vọng 16 và 1
+FROM ct_phieu_muon WHERE ban_sach_id = (SELECT id FROM ban_sach WHERE ma_ban_sach = 'BS003') AND ngay_tra IS NULL;
+
+-- D8. Thêm đầu sách mới kèm 2 tác giả rồi nhập 2 bản: mã tự sinh BS100, BS101 (BS099 đã nhập ở D5), SAN_SANG
+CALL sp_them_sach('S099', '9786040000990', 'Phân tích thiết kế hệ thống', 'TL01', 'NXB01', 2025, NULL, 135000,
+                  'PTTK', 'TG01,TG02');
+CALL sp_them_ban_sach('S099', 2, 'D1-01');
+SELECT * FROM vw_tra_cuu_sach WHERE ma_sach = 'S099';   -- kỳ vọng 2 tác giả, so_ban_san_sang = 2
+
 ROLLBACK;
+SET autocommit = 1;
 
 -- E. Các lời gọi dưới đây được thiết kế để BÁO LỖI. Bỏ dấu -- ở MỘT dòng mỗi lần để xem thông báo.
 -- CALL sp_tao_phieu_muon('SV001', 'CB001', @x);   -- SV001: giữ sách quá hạn / còn nợ phạt
@@ -102,5 +125,9 @@ ROLLBACK;
 -- CALL sp_tra_sach('BS002', 'BINH_THUONG');       -- BS002 không có lượt mượn đang mở
 -- CALL sp_dat_truoc('SV005', 'S001');             -- (khi S001 hết bản) SV005 còn nợ phạt nên bị chặn đặt trước
 -- UPDATE tai_khoan SET vai_tro = 'ADMIN' WHERE ten_dang_nhap = 'sv001';   -- vai trò không phù hợp loại người dùng
+-- CALL sp_them_sach('S001', NULL, 'Trung ma', 'TL01', 'NXB01', NULL, NULL, NULL, NULL, NULL);   -- mã sách đã tồn tại
+-- CALL sp_them_sach('S098', NULL, 'Sach moi', 'TL01', 'NXB01', NULL, NULL, NULL, NULL, 'TG01,TG99');   -- TG99 không tồn tại
+-- CALL sp_dang_nhap('sv002', 'SV002@Nhom8', @tok);
+-- CALL sp_bandoc_gia_han(@tok, 'BS001', 7);       -- BS001 do SV001 mượn: SV002 không gia hạn được (báo như không có lượt mượn)
 -- INSERT INTO ban_sach (ma_ban_sach, sach_id, vi_tri_ke, ngay_nhap, tinh_trang)
 --     VALUES ('BS098', 1, 'A1-01', CURDATE(), 'DANG_MUON');   -- không được nhập bản sách ở trạng thái đang mượn

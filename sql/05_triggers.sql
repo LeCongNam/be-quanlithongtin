@@ -155,21 +155,44 @@ AFTER INSERT ON ct_phieu_muon
 FOR EACH ROW
 BEGIN
     DECLARE v_nguoi_dung_id BIGINT;
+    DECLARE v_sach_id BIGINT;
+    DECLARE v_dt_id BIGINT;
+    DECLARE v_dt_trang_thai VARCHAR(20);
+    DECLARE v_dt_ban_sach_id BIGINT;
 
     SELECT nguoi_dung_id INTO v_nguoi_dung_id
     FROM phieu_muon
     WHERE id = NEW.phieu_muon_id;
 
+    SELECT sach_id INTO v_sach_id
+    FROM ban_sach
+    WHERE id = NEW.ban_sach_id;
+
     UPDATE ban_sach
     SET tinh_trang = 'DANG_MUON'
     WHERE id = NEW.ban_sach_id;
 
-    -- mượn đúng bản đang giữ -> lượt đặt trước hoàn tất
-    UPDATE dat_truoc
-    SET trang_thai = 'DA_NHAN'
-    WHERE ban_sach_id = NEW.ban_sach_id
-      AND trang_thai = 'SAN_SANG_NHAN'
-      AND nguoi_dung_id = v_nguoi_dung_id;
+    -- Người mượn đang có lượt đặt trước hoạt động cho đầu sách này (tối đa 1, nhờ uq_dt_dang_hoat_dong) -> lượt đặt
+    -- hoàn tất, dù họ mượn đúng bản đang giữ hay mượn thẳng một bản SAN_SANG (vd. lúc nhập bản mới họ đang bị tạm
+    -- khóa nên bị bỏ qua). Nếu họ đang được giữ một bản KHÁC thì bản đó được giao cho người kế tiếp (hoặc SAN_SANG),
+    -- tránh bị giữ vô ích tới hết hạn.
+    SELECT id, trang_thai, ban_sach_id INTO v_dt_id, v_dt_trang_thai, v_dt_ban_sach_id
+    FROM dat_truoc
+    WHERE nguoi_dung_id = v_nguoi_dung_id
+      AND sach_id = v_sach_id
+      AND trang_thai IN ('CHO_XU_LY','SAN_SANG_NHAN')
+    FOR UPDATE;
+
+    IF v_dt_id IS NOT NULL THEN
+        UPDATE dat_truoc
+        SET trang_thai = 'DA_NHAN',
+            ban_sach_id = NEW.ban_sach_id
+        WHERE id = v_dt_id;
+
+        IF v_dt_trang_thai = 'SAN_SANG_NHAN' AND v_dt_ban_sach_id <> NEW.ban_sach_id THEN
+            CALL sp_cap_phat_ban_sach(v_dt_ban_sach_id);
+        END IF;
+    END IF;
 
     INSERT INTO nhat_ky_hanh_vi(nguoi_dung_id, loai_hanh_vi, doi_tuong, doi_tuong_id, mo_ta)
     VALUES(v_nguoi_dung_id, 'MUON', 'CT_PHIEU_MUON', NEW.id, 'Muon ban sach');
@@ -389,8 +412,9 @@ BEGIN
     END IF;
 END$$
 
--- Đổi trạng thái người dùng thì tài khoản đi theo (HOAT_DONG <-> KHOA); không cho đổi loại người dùng
--- làm lệch vai trò tài khoản.
+-- Người dùng bị tạm khóa/ngừng thì tài khoản bị KHOA theo. Chỉ đồng bộ chiều khóa: mở khóa người dùng KHÔNG tự mở
+-- tài khoản, vì tài khoản có thể đang bị quản trị khóa riêng (lộ mật khẩu...); quản trị mở lại bằng UPDATE tai_khoan
+-- (trg_tai_khoan_bu chỉ cho HOAT_DONG khi người dùng đã HOAT_DONG). Không cho đổi loại người dùng làm lệch vai trò.
 DROP TRIGGER IF EXISTS trg_nguoi_dung_au$$
 CREATE TRIGGER trg_nguoi_dung_au
 AFTER UPDATE ON nguoi_dung
@@ -406,10 +430,11 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Doi loai nguoi dung lam lech vai tro tai khoan';
     END IF;
 
-    IF NOT (NEW.trang_thai <=> OLD.trang_thai) THEN
+    IF NOT (NEW.trang_thai <=> OLD.trang_thai) AND NEW.trang_thai <> 'HOAT_DONG' THEN
         UPDATE tai_khoan
-        SET trang_thai = IF(NEW.trang_thai = 'HOAT_DONG', 'HOAT_DONG', 'KHOA')
-        WHERE nguoi_dung_id = NEW.id;
+        SET trang_thai = 'KHOA'
+        WHERE nguoi_dung_id = NEW.id
+          AND trang_thai <> 'KHOA';
     END IF;
 END$$
 

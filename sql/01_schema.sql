@@ -68,6 +68,17 @@ CREATE TABLE tai_khoan (
     CONSTRAINT chk_tk_trang_thai CHECK (trang_thai IN ('HOAT_DONG','KHOA'))
 ) ENGINE=InnoDB;
 
+-- Phiên đăng nhập của bạn đọc (sp_dang_nhap). CSDL chỉ lưu SHA-256 của token nên đọc được bảng này cũng không dùng lại
+-- được token; token thật chỉ có ở bên nhận từ sp_dang_nhap. Vai trò bạn đọc/thủ thư không có quyền nào trên bảng.
+CREATE TABLE phien_dang_nhap (
+    token_hash CHAR(64) PRIMARY KEY,
+    nguoi_dung_id BIGINT NOT NULL,
+    tao_luc DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    het_han DATETIME NOT NULL,
+    da_dang_xuat BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT fk_pdn_nguoi_dung FOREIGN KEY (nguoi_dung_id) REFERENCES nguoi_dung(id)
+) ENGINE=InnoDB;
+
 -- gia_bia: giá bìa (NULL nếu chưa biết); dùng để tính tiền đền khi mất sách (xem fn_tien_phat_mat_sach).
 CREATE TABLE sach (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -104,6 +115,7 @@ CREATE TABLE ban_sach (
     ngay_nhap DATE NOT NULL,
     tinh_trang VARCHAR(20) NOT NULL DEFAULT 'SAN_SANG',
     CONSTRAINT fk_bs_sach FOREIGN KEY (sach_id) REFERENCES sach(id),
+    CONSTRAINT uq_bs_id_sach UNIQUE (id, sach_id), -- đích của khóa ngoại ghép fk_dt_ban_sach (dat_truoc)
     CONSTRAINT chk_bs_tinh_trang CHECK (tinh_trang IN ('SAN_SANG','DANG_MUON','DANG_GIU','HU_HONG','MAT','NGUNG_PHUC_VU'))
 ) ENGINE=InnoDB;
 
@@ -176,7 +188,7 @@ CREATE TABLE dat_truoc (
     CONSTRAINT uq_dt_dang_giu UNIQUE (ban_sach_dang_giu),
     CONSTRAINT fk_dt_nguoi_dung FOREIGN KEY (nguoi_dung_id) REFERENCES nguoi_dung(id),
     CONSTRAINT fk_dt_sach FOREIGN KEY (sach_id) REFERENCES sach(id),
-    CONSTRAINT fk_dt_ban_sach FOREIGN KEY (ban_sach_id) REFERENCES ban_sach(id),
+    CONSTRAINT fk_dt_ban_sach FOREIGN KEY (ban_sach_id, sach_id) REFERENCES ban_sach(id, sach_id), -- bản được giữ phải cùng đầu sách
     CONSTRAINT chk_dt_trang_thai CHECK (trang_thai IN ('CHO_XU_LY','SAN_SANG_NHAN','DA_NHAN','HUY','HET_HAN')),
     CONSTRAINT chk_dt_giu_cho CHECK (trang_thai <> 'SAN_SANG_NHAN' OR (ban_sach_id IS NOT NULL AND han_giu IS NOT NULL))
 ) ENGINE=InnoDB;
@@ -192,13 +204,19 @@ CREATE TABLE nhat_ky_hanh_vi (
     CONSTRAINT fk_nkhv_nguoi_dung FOREIGN KEY (nguoi_dung_id) REFERENCES nguoi_dung(id),
     CONSTRAINT chk_nkhv_loai CHECK (loai_hanh_vi IN
         ('TRA_CUU','MUON','TRA','GIA_HAN','DAT_TRUOC','HUY_DAT_TRUOC','GIU_SACH','HET_HAN_DAT_TRUOC',
-         'VI_PHAM','THANH_TOAN_PHAT','DOI_TINH_TRANG','HUY_PHIEU_MUON','HUY_PHAT')),
+         'VI_PHAM','THANH_TOAN_PHAT','DOI_TINH_TRANG','HUY_PHIEU_MUON','HUY_PHAT','DOI_TRANG_THAI_ND')),
     CONSTRAINT chk_nkhv_doi_tuong CHECK (doi_tuong IS NULL OR doi_tuong IN
-        ('CT_PHIEU_MUON','SACH','BAN_SACH','DAT_TRUOC','PHIEU_PHAT','PHIEU_MUON'))
+        ('CT_PHIEU_MUON','SACH','BAN_SACH','DAT_TRUOC','PHIEU_PHAT','PHIEU_MUON','NGUOI_DUNG'))
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_sach_ten ON sach(ten_sach);
-CREATE FULLTEXT INDEX ft_sach_ten_mo_ta ON sach(ten_sach, mo_ta);
+-- Tiếng Việt: âm tiết dài 1-3 ký tự (cơ, sở, hệ, an) và từ ngắn (IT) phải tìm được. Parser mặc định bỏ token ngắn hơn
+-- innodb_ft_min_token_size (3) và các stopword tiếng Anh (it, an, for...), nên dùng ngram (khai trong DDL, không phụ thuộc
+-- cấu hình máy chủ; ngram_token_size mặc định 2) và tắt stopword riêng cho chỉ mục này (tùy chọn theo phiên, lưu cùng chỉ mục).
+SET @qltv_ft_stopword_cu = @@SESSION.innodb_ft_enable_stopword;
+SET SESSION innodb_ft_enable_stopword = OFF;
+CREATE FULLTEXT INDEX ft_sach_ten_mo_ta ON sach(ten_sach, mo_ta) WITH PARSER ngram;
+SET SESSION innodb_ft_enable_stopword = @qltv_ft_stopword_cu;
 CREATE INDEX idx_tac_gia_ten ON tac_gia(ten_tac_gia);
 CREATE INDEX idx_bs_tinh_trang ON ban_sach(tinh_trang);
 CREATE INDEX idx_bs_sach_tinh_trang ON ban_sach(sach_id, tinh_trang);
@@ -208,3 +226,4 @@ CREATE INDEX idx_dt_trang_thai ON dat_truoc(trang_thai);
 CREATE INDEX idx_dt_hang_doi ON dat_truoc(sach_id, trang_thai, ngay_dat);
 CREATE INDEX idx_nkhv_doi_tuong ON nhat_ky_hanh_vi(loai_hanh_vi, doi_tuong, doi_tuong_id, thoi_gian);
 CREATE INDEX idx_nkhv_thoi_gian ON nhat_ky_hanh_vi(thoi_gian);
+CREATE INDEX idx_pdn_het_han ON phien_dang_nhap(het_han);
