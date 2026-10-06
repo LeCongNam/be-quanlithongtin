@@ -102,24 +102,17 @@ export class MuonTraService {
     });
   }
 
+  /**
+   * Bạn đọc gia hạn qua sp_gia_han_luot_muon: điều kiện "lượt mượn thuộc người này" nằm ngay trong
+   * SELECT ... FOR UPDATE của procedure; sách của người khác bị báo như không có lượt mượn (422).
+   */
   async giaHan({ maBanSach, soNgay }: GiaHanDto, user: AuthUser) {
-    if (!isStaff(user)) {
-      const luotMuon = await this.prisma.ctPhieuMuon.findFirst({
-        where: { banSach: { maBanSach }, ngayTra: null },
-        select: {
-          phieuMuon: {
-            select: { nguoiDung: { select: { maNguoiDung: true } } },
-          },
-        },
-      });
-      if (
-        luotMuon &&
-        luotMuon.phieuMuon.nguoiDung.maNguoiDung !== user.maNguoiDung
-      ) {
-        throw new ForbiddenException('Chi duoc gia han sach cua chinh minh');
-      }
+    if (isStaff(user)) {
+      await this.prisma.$executeRaw`CALL sp_gia_han(${maBanSach}, ${soNgay})`;
+    } else {
+      await this.prisma
+        .$executeRaw`CALL sp_gia_han_luot_muon(${maBanSach}, ${soNgay}, ${user.maNguoiDung})`;
     }
-    await this.prisma.$executeRaw`CALL sp_gia_han(${maBanSach}, ${soNgay})`;
     return this.prisma.ctPhieuMuon.findFirst({
       where: { banSach: { maBanSach }, ngayTra: null },
       include: { phieuMuon: { select: { maPhieu: true } } },
