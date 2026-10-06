@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -13,6 +14,7 @@ import {
   TrangThaiTaiKhoan,
   VaiTroTaiKhoan,
 } from '../common/db-enums.js';
+import type { AuthUser } from '../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateDocgiaDto } from './dto/create-docgia.dto.js';
 import { CreateTaiKhoanDto } from './dto/create-tai-khoan.dto.js';
@@ -34,7 +36,6 @@ export class DocgiaService {
         maNguoiDung: dto.maNguoiDung,
         hoTen: dto.hoTen,
         loaiNguoiDung: dto.loaiNguoiDung,
-        trangThai: dto.trangThai,
         email: dto.email?.trim() || null,
         sdt: dto.sdt?.trim() || null,
         khoaDonVi: dto.khoaDonVi?.trim() || null,
@@ -81,7 +82,6 @@ export class DocgiaService {
         maNguoiDung: dto.maNguoiDung,
         hoTen: dto.hoTen,
         loaiNguoiDung: dto.loaiNguoiDung,
-        trangThai: dto.trangThai,
         email: dto.email === undefined ? undefined : dto.email.trim() || null,
         sdt: dto.sdt,
         khoaDonVi: dto.khoaDonVi,
@@ -89,17 +89,46 @@ export class DocgiaService {
     });
   }
 
-  /** Không xóa cứng (còn phiếu mượn/phạt tham chiếu): chuyển sang NGUNG và khóa tài khoản. */
-  async remove(id: bigint) {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.taiKhoan.updateMany({
-        where: { nguoiDungId: id },
-        data: { trangThai: TrangThaiTaiKhoan.KHOA },
-      });
-      return tx.nguoiDung.update({
+  /**
+   * Bạn đọc: qua sp_doi_trang_thai_nguoi_dung (ghi nhật ký DOI_TRANG_THAI_ND). Cán bộ: procedure từ chối,
+   * chỉ quản trị đổi trực tiếp. Khi người dùng rời HOAT_DONG, trg_nguoi_dung_au tự khóa tài khoản;
+   * quay lại HOAT_DONG thì tài khoản vẫn KHOA, quản trị phải mở riêng (doiTrangThaiTaiKhoan).
+   */
+  async doiTrangThai(
+    id: bigint,
+    trangThai: TrangThaiNguoiDung,
+    user: AuthUser,
+  ) {
+    const nd = await this.findOne(id);
+    if (nd.loaiNguoiDung === LoaiNguoiDung.CAN_BO) {
+      if (user.vaiTro !== VaiTroTaiKhoan.ADMIN)
+        throw new ForbiddenException('Chi quan tri doi trang thai can bo');
+      await this.prisma.nguoiDung.update({
         where: { id },
-        data: { trangThai: TrangThaiNguoiDung.NGUNG },
+        data: { trangThai },
       });
+    } else {
+      await this.prisma
+        .$executeRaw`CALL sp_doi_trang_thai_nguoi_dung(${nd.maNguoiDung}, ${trangThai})`;
+    }
+    return this.findOne(id);
+  }
+
+  /** Không xóa cứng (còn phiếu mượn/phạt tham chiếu): chuyển sang NGUNG, trigger khóa tài khoản theo. */
+  remove(id: bigint, user: AuthUser) {
+    return this.doiTrangThai(id, TrangThaiNguoiDung.NGUNG, user);
+  }
+
+  /** Chỉ quản trị. trg_tai_khoan_bu từ chối mở tài khoản khi người dùng chưa HOAT_DONG (422). */
+  async doiTrangThaiTaiKhoan(id: bigint, trangThai: TrangThaiTaiKhoan) {
+    const taiKhoan = await this.prisma.taiKhoan.findUnique({
+      where: { nguoiDungId: id },
+    });
+    if (!taiKhoan) throw new NotFoundException('Nguoi dung chua co tai khoan');
+    return this.prisma.taiKhoan.update({
+      where: { nguoiDungId: id },
+      data: { trangThai },
+      ...TAI_KHOAN_PUBLIC,
     });
   }
 

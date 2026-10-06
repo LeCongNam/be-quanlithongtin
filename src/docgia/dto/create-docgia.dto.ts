@@ -1,4 +1,4 @@
-import { LoaiNguoiDung, TrangThaiNguoiDung } from '../../common/db-enums.js';
+import { LoaiNguoiDung } from '../../common/db-enums.js';
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
@@ -10,6 +10,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 
+/** Người mới luôn HOAT_DONG; đổi trạng thái qua PATCH /docgia/:id/trang-thai. */
 export class CreateDocgiaDto {
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
@@ -25,9 +26,6 @@ export class CreateDocgiaDto {
 
   @IsEnum(LoaiNguoiDung)
   loaiNguoiDung!: LoaiNguoiDung;
-
-  @IsEnum(TrangThaiNguoiDung)
-  trangThai!: TrangThaiNguoiDung;
 
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @ValidateIf(
