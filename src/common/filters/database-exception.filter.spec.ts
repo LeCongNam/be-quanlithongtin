@@ -48,6 +48,17 @@ describe('DatabaseExceptionFilter', () => {
     expect(run(known(code)).statusCode).toBe(status);
   });
 
+  it('SIGNAL của trigger khi ghi bằng model Prisma -> 422 kèm thông báo', () => {
+    const err = new Prisma.PrismaClientUnknownRequestError(
+      'Error occurred during query execution:\nConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(Server(MysqlError { code: 1644, message: "Nguoi dung khong hoat dong, tai khoan phai o trang thai KHOA", state: "45000" })), transient: false })',
+      { clientVersion: 'test' },
+    );
+    expect(run(err)).toMatchObject({
+      statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+      message: 'Nguoi dung khong hoat dong, tai khoan phai o trang thai KHOA',
+    });
+  });
+
   it('CHECK constraint bị vi phạm -> 400', () => {
     const err = new Prisma.PrismaClientUnknownRequestError(
       'MysqlError { code: 3819 }',

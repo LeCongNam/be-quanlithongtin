@@ -10,6 +10,10 @@ import type { Response } from 'express';
 
 // MySQL SIGNAL SQLSTATE '45000' (trigger/procedure) -> mã lỗi 1644 trong Prisma raw query.
 const MYSQL_SIGNAL_CODE = '1644';
+// Trigger SIGNAL khi ghi bằng model Prisma (create/update...) đến dưới dạng lỗi không xác định:
+// `MysqlError { code: 1644, message: "...", state: "45000" }`.
+const MYSQL_SIGNAL_IN_MESSAGE =
+  /MysqlError \{ code: 1644, message: "((?:[^"\\]|\\.)*)"/;
 // MySQL 3819: vi phạm CHECK constraint.
 const MYSQL_CHECK_VIOLATION = /code: 3819/;
 
@@ -74,6 +78,11 @@ export class DatabaseExceptionFilter implements ExceptionFilter {
             message: 'Khong tim thay ban ghi',
           };
       }
+    } else if (MYSQL_SIGNAL_IN_MESSAGE.test(exception.message)) {
+      return {
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        message: MYSQL_SIGNAL_IN_MESSAGE.exec(exception.message)![1],
+      };
     } else if (MYSQL_CHECK_VIOLATION.test(exception.message)) {
       return {
         status: HttpStatus.BAD_REQUEST,
