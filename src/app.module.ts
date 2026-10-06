@@ -8,6 +8,9 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { DocgiaModule } from './docgia/docgia.module.js';
 import { DanhMucModule } from './danh-muc/danh-muc.module.js';
 import { SachModule } from './sach/sach.module.js';
+import { MuonTraModule } from './muon-tra/muon-tra.module.js';
+import { DatTruocModule } from './dat-truoc/dat-truoc.module.js';
+import { PhatModule } from './phat/phat.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { DatabaseExceptionFilter } from './common/filters/database-exception.filter.js';
 
@@ -21,6 +24,9 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     DocgiaModule,
     DanhMucModule,
     SachModule,
+    MuonTraModule,
+    DatTruocModule,
+    PhatModule,
   ],
   controllers: [AppController],
   providers: [
