@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import { isStaff } from '../common/auth-helpers.js';
 import type { AuthUser } from '../common/decorators/current-user.decorator.js';
 import { paginate, skipTake } from '../common/dto/page-query.dto.js';
+import { withProcTransaction } from '../common/proc-transaction.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   GiaHanDto,
@@ -37,10 +38,10 @@ export class MuonTraService {
 
   /**
    * Lập phiếu + thêm từng bản sách trong một transaction: một cuốn bị từ chối (hết hạn mức,
-   * không sẵn sàng, ...) thì không để lại phiếu rỗng. Luật mượn nằm trong procedure.
+   * không sẵn sàng, ...) thì không để lại phiếu rỗng hay cuốn đã ghi trước đó. Luật mượn nằm trong procedure.
    */
   async taoPhieu(dto: TaoPhieuMuonDto, nhanVien: AuthUser) {
-    const maPhieu = await this.prisma.$transaction(async (tx) => {
+    const maPhieu = await withProcTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`CALL sp_tao_phieu_muon(${dto.maNguoiDung}, ${nhanVien.maNguoiDung}, @ma_phieu)`;
       const [{ ma_phieu }] = await tx.$queryRaw<
         { ma_phieu: string }[]
