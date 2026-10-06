@@ -1,21 +1,25 @@
-version: '3.8'
-
 services:
   db:
     image: mysql:8.0
     container_name: mysql_container
     restart: always
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      # Ép client của entrypoint dùng utf8mb4 khi nạp SQL, nếu không tiếng Việt bị mã hóa đôi (latin1)
+      - --character-set-client-handshake=FALSE
+      - --event-scheduler=ON
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: qltv_nhom8
       MYSQL_USER: qltt
-      MYSQL_PASSWORD: root
+      MYSQL_PASSWORD: qltt_password
     ports:
       - "3306:3306"
     volumes:
-      # Mount file init.sql vào thư mục tự động chạy của container
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-      # (Tùy chọn) Lưu trữ dữ liệu lâu dài không bị mất khi xóa container
+      # Schema chuẩn (00..08): bảng, seed, function, procedure, trigger, cursor/event, view, role.
+      # Chỉ chạy lần đầu khi volume rỗng; muốn nạp lại: docker compose down -v
+      - ./sql/99_full_setup.sql:/docker-entrypoint-initdb.d/01_full_setup.sql:ro
       - mysql_data:/var/lib/mysql
 
 volumes:

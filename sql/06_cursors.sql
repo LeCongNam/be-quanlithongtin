@@ -3,6 +3,8 @@ USE qltv_nhom8;
 -- 06. CURSORS
 DELIMITER $$
 
+-- Ghi nhật ký VI_PHAM (mỗi lượt mượn quá hạn tối đa 1 lần/ngày). Tiền phạt tạm tính xem ở vw_muon_qua_han;
+-- phiếu phạt chính thức được lập khi trả sách. Người đang quá hạn bị chặn mượn thêm (fn_ly_do_khong_the_muon).
 DROP PROCEDURE IF EXISTS sp_cursor_danh_dau_qua_han$$
 CREATE PROCEDURE sp_cursor_danh_dau_qua_han()
 BEGIN
@@ -45,6 +47,8 @@ BEGIN
     CLOSE cur;
 END$$
 
+-- Thống kê theo người dùng: so_phieu_muon = số phiếu, so_sach_da_muon = số lượt mượn bản sách
+-- (cùng đơn vị với vw_top_sach_muon_nhieu).
 DROP PROCEDURE IF EXISTS sp_cursor_thong_ke_muon_theo_nguoi_dung$$
 CREATE PROCEDURE sp_cursor_thong_ke_muon_theo_nguoi_dung()
 BEGIN
@@ -52,7 +56,8 @@ BEGIN
     DECLARE v_id BIGINT;
     DECLARE v_ma VARCHAR(20);
     DECLARE v_ten VARCHAR(160);
-    DECLARE v_so_luot INT;
+    DECLARE v_so_phieu INT;
+    DECLARE v_so_sach INT;
 
     DECLARE cur CURSOR FOR
         SELECT id, ma_nguoi_dung, ho_ten
@@ -65,7 +70,8 @@ BEGIN
     CREATE TEMPORARY TABLE tmp_thong_ke_muon (
         ma_nguoi_dung VARCHAR(20),
         ho_ten VARCHAR(160),
-        so_luot_muon INT
+        so_phieu_muon INT,
+        so_sach_da_muon INT
     );
 
     OPEN cur;
@@ -77,19 +83,78 @@ BEGIN
             LEAVE read_loop;
         END IF;
 
-        SELECT COUNT(*) INTO v_so_luot
+        SELECT COUNT(*) INTO v_so_phieu
         FROM phieu_muon
         WHERE nguoi_dung_id = v_id;
 
+        SELECT COUNT(*) INTO v_so_sach
+        FROM ct_phieu_muon c
+        JOIN phieu_muon p ON p.id = c.phieu_muon_id
+        WHERE p.nguoi_dung_id = v_id;
+
         INSERT INTO tmp_thong_ke_muon
-        VALUES(v_ma, v_ten, v_so_luot);
+        VALUES(v_ma, v_ten, v_so_phieu, v_so_sach);
     END LOOP;
 
     CLOSE cur;
 
     SELECT *
     FROM tmp_thong_ke_muon
-    ORDER BY so_luot_muon DESC, ma_nguoi_dung;
+    ORDER BY so_sach_da_muon DESC, so_phieu_muon DESC, ma_nguoi_dung;
+END$$
+
+-- Xử lý các lượt giữ sách quá hạn: đánh dấu HET_HAN rồi giao bản sách cho người kế tiếp (hoặc trả về SAN_SANG).
+DROP PROCEDURE IF EXISTS sp_cursor_het_han_dat_truoc$$
+CREATE PROCEDURE sp_cursor_het_han_dat_truoc()
+BEGIN
+    DECLARE done INT DEFAULT 0;
+    DECLARE v_dt_id BIGINT;
+    DECLARE v_nguoi_dung_id BIGINT;
+    DECLARE v_ban_sach_id BIGINT;
+
+    DECLARE cur CURSOR FOR
+        SELECT id, nguoi_dung_id, ban_sach_id
+        FROM dat_truoc
+        WHERE trang_thai = 'SAN_SANG_NHAN'
+          AND han_giu < NOW();
+
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+
+    OPEN cur;
+
+    read_loop: LOOP
+        FETCH cur INTO v_dt_id, v_nguoi_dung_id, v_ban_sach_id;
+
+        IF done = 1 THEN
+            LEAVE read_loop;
+        END IF;
+
+        UPDATE dat_truoc SET trang_thai = 'HET_HAN' WHERE id = v_dt_id;
+
+        CALL sp_cap_phat_ban_sach(v_ban_sach_id);
+
+        INSERT INTO nhat_ky_hanh_vi(nguoi_dung_id, loai_hanh_vi, doi_tuong, doi_tuong_id, mo_ta)
+        VALUES(v_nguoi_dung_id, 'HET_HAN_DAT_TRUOC', 'DAT_TRUOC', v_dt_id, 'Het han giu sach');
+
+        -- lệnh bên trong có thể làm bật NOT FOUND; chỉ FETCH mới quyết định kết thúc vòng lặp
+        SET done = 0;
+    END LOOP;
+
+    CLOSE cur;
 END$$
 
 DELIMITER ;
+
+-- Lập lịch tự động (cần event_scheduler = ON, mặc định của MySQL 8.0+; kiểm tra: SHOW VARIABLES LIKE 'event_scheduler').
+-- Giữ sách hết hạn được xử lý mỗi giờ để bản sách không bị kẹt ở DANG_GIU; quá hạn mượn ghi nhật ký mỗi ngày.
+DROP EVENT IF EXISTS ev_het_han_dat_truoc;
+CREATE EVENT ev_het_han_dat_truoc
+ON SCHEDULE EVERY 1 HOUR
+STARTS (TIMESTAMP(CURRENT_DATE) + INTERVAL 1 DAY)
+DO CALL sp_cursor_het_han_dat_truoc();
+
+DROP EVENT IF EXISTS ev_danh_dau_qua_han;
+CREATE EVENT ev_danh_dau_qua_han
+ON SCHEDULE EVERY 1 DAY
+STARTS (TIMESTAMP(CURRENT_DATE) + INTERVAL 1 DAY + INTERVAL 5 MINUTE)
+DO CALL sp_cursor_danh_dau_qua_han();
