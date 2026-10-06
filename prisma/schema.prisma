@@ -42,19 +42,20 @@ model TacGia {
 }
 
 model NguoiDung {
-  id               BigInt         @id @default(autoincrement())
-  maNguoiDung      String         @unique(map: "ma_nguoi_dung") @map("ma_nguoi_dung") @db.VarChar(20)
-  hoTen            String         @map("ho_ten") @db.VarChar(160)
-  loaiNguoiDung    String         @map("loai_nguoi_dung") @db.VarChar(20)
-  email            String?        @unique(map: "email") @db.VarChar(120)
-  sdt              String?        @db.VarChar(20)
-  khoaDonVi        String?        @map("khoa_don_vi") @db.VarChar(160)
-  trangThai        String         @default("HOAT_DONG") @map("trang_thai") @db.VarChar(20)
-  createdAt        DateTime       @default(now()) @map("created_at") @db.DateTime(0)
+  id               BigInt          @id @default(autoincrement())
+  maNguoiDung      String          @unique(map: "ma_nguoi_dung") @map("ma_nguoi_dung") @db.VarChar(20)
+  hoTen            String          @map("ho_ten") @db.VarChar(160)
+  loaiNguoiDung    String          @map("loai_nguoi_dung") @db.VarChar(20)
+  email            String?         @unique(map: "email") @db.VarChar(120)
+  sdt              String?         @db.VarChar(20)
+  khoaDonVi        String?         @map("khoa_don_vi") @db.VarChar(160)
+  trangThai        String          @default("HOAT_DONG") @map("trang_thai") @db.VarChar(20)
+  createdAt        DateTime        @default(now()) @map("created_at") @db.DateTime(0)
   datTruocs        DatTruoc[]
   nhatKyHanhVis    NhatKyHanhVi[]
-  phieuMuons       PhieuMuon[]    @relation("NguoiMuon")
-  phieuMuonCapNhat PhieuMuon[]    @relation("NhanVienXuly")
+  phienDangNhaps   PhienDangNhap[]
+  phieuMuons       PhieuMuon[]     @relation("NguoiMuon")
+  phieuMuonCapNhat PhieuMuon[]     @relation("NhanVienXuly")
   taiKhoan         TaiKhoan?
 
   @@map("nguoi_dung")
@@ -120,6 +121,7 @@ model BanSach {
   ctPhieuMuons CtPhieuMuon[]
   datTruocs    DatTruoc[]
 
+  @@unique([id, sachId], map: "uq_bs_id_sach")
   @@index([tinhTrang], map: "idx_bs_tinh_trang")
   @@index([sachId, tinhTrang], map: "idx_bs_sach_tinh_trang")
   @@map("ban_sach")
@@ -189,12 +191,12 @@ model DatTruoc {
   khoaDangHoatDong String?   @unique(map: "uq_dt_dang_hoat_dong") @map("khoa_dang_hoat_dong") @db.VarChar(50)
   /// Cột GENERATED trong DB (chỉ đọc, không được ghi qua Prisma)
   banSachDangGiu   BigInt?   @unique(map: "uq_dt_dang_giu") @map("ban_sach_dang_giu")
-  banSach          BanSach?  @relation(fields: [banSachId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_dt_ban_sach")
+  banSach          BanSach?  @relation(fields: [banSachId, sachId], references: [id, sachId], onDelete: NoAction, onUpdate: NoAction, map: "fk_dt_ban_sach")
   nguoiDung        NguoiDung @relation(fields: [nguoiDungId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_dt_nguoi_dung")
   sach             Sach      @relation(fields: [sachId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_dt_sach")
 
   @@index([trangThai], map: "idx_dt_trang_thai")
-  @@index([banSachId], map: "fk_dt_ban_sach")
+  @@index([banSachId, sachId], map: "fk_dt_ban_sach")
   @@index([nguoiDungId], map: "fk_dt_nguoi_dung")
   @@index([sachId, trangThai, ngayDat], map: "idx_dt_hang_doi")
   @@map("dat_truoc")
@@ -224,4 +226,17 @@ model ThamSo {
   moTa     String? @map("mo_ta") @db.VarChar(255)
 
   @@map("tham_so")
+}
+
+model PhienDangNhap {
+  tokenHash   String    @id @map("token_hash") @db.Char(64)
+  nguoiDungId BigInt    @map("nguoi_dung_id")
+  taoLuc      DateTime  @default(now()) @map("tao_luc") @db.DateTime(0)
+  hetHan      DateTime  @map("het_han") @db.DateTime(0)
+  daDangXuat  Boolean   @default(false) @map("da_dang_xuat")
+  nguoiDung   NguoiDung @relation(fields: [nguoiDungId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_pdn_nguoi_dung")
+
+  @@index([nguoiDungId], map: "fk_pdn_nguoi_dung")
+  @@index([hetHan], map: "idx_pdn_het_han")
+  @@map("phien_dang_nhap")
 }
