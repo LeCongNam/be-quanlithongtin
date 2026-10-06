@@ -14,6 +14,10 @@ const ADMIN = {
   tenDangNhap: process.env.E2E_ADMIN_USER ?? 'ad001',
   matKhau: process.env.E2E_ADMIN_PASSWORD ?? 'AD001@Nhom8',
 };
+const THU_THU = {
+  tenDangNhap: process.env.E2E_THU_THU_USER ?? 'cb001',
+  matKhau: process.env.E2E_THU_THU_PASSWORD ?? 'CB001@Nhom8',
+};
 const sfx = Date.now().toString(36).toUpperCase().slice(-7);
 const READER_A = `EA${sfx}`;
 const READER_B = `EB${sfx}`;
@@ -25,7 +29,12 @@ describe('Library API (e2e)', () => {
   let admin: string;
   let readerA: string;
   let readerB: string;
+  let thuThu: string;
   const ids: Record<string, string> = {};
+  const sachIds: Record<string, string> = {};
+  const docgiaIds: Record<string, string> = {};
+  /** Mã bản sách do sp_them_ban_sach sinh (BSnnn) */
+  const bs: Record<string, string[]> = {};
   const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
   const login = async (tenDangNhap: string, matKhau: string) => {
@@ -47,6 +56,7 @@ describe('Library API (e2e)', () => {
     await app.init();
     http = request(app.getHttpServer());
     admin = await login(ADMIN.tenDangNhap, ADMIN.matKhau);
+    thuThu = await login(THU_THU.tenDangNhap, THU_THU.matKhau);
 
     // Dữ liệu: 2 bạn đọc có tài khoản, 1 sách (2 bản), 1 sách (1 bản)
     for (const ma of [READER_A, READER_B]) {
@@ -57,9 +67,10 @@ describe('Library API (e2e)', () => {
           maNguoiDung: ma,
           hoTen: `Doc gia ${ma}`,
           loaiNguoiDung: 'SINH_VIEN',
-          trangThai: 'HOAT_DONG',
         })
         .expect(201);
+      expect(dg.body.trangThai).toBe('HOAT_DONG');
+      docgiaIds[ma] = dg.body.id;
       await http
         .post(`/docgia/${dg.body.id}/tai-khoan`)
         .set(auth(admin))
@@ -69,17 +80,17 @@ describe('Library API (e2e)', () => {
     readerA = await login(READER_A.toLowerCase(), PASSWORD);
     readerB = await login(READER_B.toLowerCase(), PASSWORD);
 
-    const tl = await http
+    await http
       .post('/the-loai')
       .set(auth(admin))
       .send({ maTheLoai: `TL${sfx}`, tenTheLoai: 'The loai test' })
       .expect(201);
-    const nxb = await http
+    await http
       .post('/nha-xuat-ban')
       .set(auth(admin))
       .send({ maNxb: `NXB${sfx}`, tenNxb: 'NXB test' })
       .expect(201);
-    const tg = await http
+    await http
       .post('/tac-gia')
       .set(auth(admin))
       .send({ maTacGia: `TG${sfx}`, tenTacGia: 'Tac gia test', namSinh: 1980 })
@@ -94,24 +105,22 @@ describe('Library API (e2e)', () => {
         .send({
           maSach: ma,
           tenSach: `Sach test ${ma}`,
-          theLoaiId: Number(tl.body.id),
-          nxbId: Number(nxb.body.id),
-          tacGiaIds: [Number(tg.body.id)],
+          maTheLoai: `TL${sfx}`,
+          maNxb: `NXB${sfx}`,
+          maTacGias: [`TG${sfx}`],
           giaBia: 100000,
         })
         .expect(201);
+      expect(sach.body.sachTacGias).toHaveLength(1);
       ids[key] = ma;
-      for (let i = 1; i <= soBan; i++) {
-        await http
-          .post(`/sach/${sach.body.id}/ban-sach`)
-          .set(auth(admin))
-          .send({
-            maBanSach: `${ma}-${i}`,
-            viTriKe: 'K-TEST',
-            ngayNhap: '2026-01-01',
-          })
-          .expect(201);
-      }
+      sachIds[key] = sach.body.id;
+      const ban = await http
+        .post(`/sach/${sach.body.id}/ban-sach`)
+        .set(auth(admin))
+        .send({ soBan, viTriKe: 'K-TEST' })
+        .expect(201);
+      expect(ban.body).toHaveLength(soBan);
+      bs[key] = ban.body.map((b: { ma_ban_sach: string }) => b.ma_ban_sach);
     }
   });
 
@@ -143,6 +152,26 @@ describe('Library API (e2e)', () => {
       await http.get('/sach/abc').set(auth(admin)).expect(400);
     });
 
+    it('thêm sách với mã tác giả không tồn tại -> 422, không thêm gì', async () => {
+      await http
+        .post('/sach')
+        .set(auth(admin))
+        .send({
+          maSach: `SX${sfx}`,
+          tenSach: 'Sach loi',
+          maTheLoai: `TL${sfx}`,
+          maNxb: `NXB${sfx}`,
+          maTacGias: [`TG${sfx}`, 'KHONG_CO'],
+        })
+        .expect(422);
+      const res = await http
+        .get('/sach')
+        .query({ tuKhoa: `SX${sfx}` })
+        .set(auth(admin))
+        .expect(200);
+      expect(res.body.data).toHaveLength(0);
+    });
+
     it('lỗi trùng khóa -> 409, không có bản ghi -> 404', async () => {
       await http
         .post('/the-loai')
@@ -164,6 +193,29 @@ describe('Library API (e2e)', () => {
         res.body.data.map((r: { ma_sach: string }) => r.ma_sach),
       ).toContain(ids.s1);
     });
+
+    it('tìm tiếng Việt (FULLTEXT ngram) và ký tự đại diện được hiểu theo nghĩa đen', async () => {
+      const coSo = await http
+        .get('/sach')
+        .query({ tuKhoa: 'cơ sở' })
+        .set(auth(readerA))
+        .expect(200);
+      expect(coSo.body.data.map((r: { ma_sach: string }) => r.ma_sach)).toEqual(
+        expect.arrayContaining(['S001', 'S002']),
+      );
+      const percent = await http
+        .get('/sach')
+        .query({ tuKhoa: '%' })
+        .set(auth(readerA))
+        .expect(200);
+      expect(percent.body.data).toHaveLength(0);
+      const blank = await http
+        .get('/sach')
+        .query({ tuKhoa: '   ' })
+        .set(auth(readerA))
+        .expect(200);
+      expect(blank.body.total).toBeGreaterThan(0);
+    });
   });
 
   describe('mượn - gia hạn - trả - phạt', () => {
@@ -173,14 +225,14 @@ describe('Library API (e2e)', () => {
       const res = await http
         .post('/phieu-muon')
         .set(auth(admin))
-        .send({ maNguoiDung: READER_A, maBanSachs: [`${ids.s1}-1`] })
+        .send({ maNguoiDung: READER_A, maBanSachs: [bs.s1[0]] })
         .expect(201);
       maPhieu = res.body.maPhieu;
       expect(res.body.trangThai).toBe('DANG_MUON');
       expect(res.body.ctPhieuMuons).toHaveLength(1);
     });
 
-    it('một bản sách không thể cho mượn hai lần (lỗi nghiệp vụ DB -> 422, không để lại phiếu rỗng)', async () => {
+    it('một bản sách không thể cho mượn hai lần (422); cả phiếu được hoàn tác, kể cả cuốn hợp lệ ghi trước', async () => {
       const before = await http
         .get('/phieu-muon')
         .query({ maNguoiDung: READER_B })
@@ -189,7 +241,7 @@ describe('Library API (e2e)', () => {
       const res = await http
         .post('/phieu-muon')
         .set(auth(admin))
-        .send({ maNguoiDung: READER_B, maBanSachs: [`${ids.s1}-1`] })
+        .send({ maNguoiDung: READER_B, maBanSachs: [bs.s1[1], bs.s1[0]] })
         .expect(422);
       expect(res.body.message).toBeTruthy();
       const after = await http
@@ -198,6 +250,15 @@ describe('Library API (e2e)', () => {
         .set(auth(admin))
         .expect(200);
       expect(after.body.total).toBe(before.body.total);
+      // procedure tự COMMIT nếu bị bọc bằng $transaction trần: bản thứ nhất sẽ kẹt ở DANG_MUON
+      const banSach = await http
+        .get(`/sach/${sachIds.s1}/ban-sach`)
+        .set(auth(admin))
+        .expect(200);
+      const ban1 = banSach.body.find(
+        (b: { maBanSach: string }) => b.maBanSach === bs.s1[1],
+      );
+      expect(ban1.tinhTrang).toBe('SAN_SANG');
     });
 
     it('bạn đọc chỉ xem được phiếu của mình và thấy sách đang mượn', async () => {
@@ -209,25 +270,26 @@ describe('Library API (e2e)', () => {
         .expect(200);
       expect(
         res.body.map((r: { ma_ban_sach: string }) => r.ma_ban_sach),
-      ).toContain(`${ids.s1}-1`);
+      ).toContain(bs.s1[0]);
     });
 
     it('gia hạn 1 lần được, lần hai bị từ chối; không gia hạn hộ người khác', async () => {
+      // sp_gia_han_luot_muon: sách của người khác bị báo như không có lượt mượn
       await http
         .post('/muon-tra/gia-han')
         .set(auth(readerB))
-        .send({ maBanSach: `${ids.s1}-1`, soNgay: 3 })
-        .expect(403);
+        .send({ maBanSach: bs.s1[0], soNgay: 3 })
+        .expect(422);
       const ok = await http
         .post('/muon-tra/gia-han')
         .set(auth(readerA))
-        .send({ maBanSach: `${ids.s1}-1`, soNgay: 3 })
+        .send({ maBanSach: bs.s1[0], soNgay: 3 })
         .expect(200);
       expect(ok.body.soLanGiaHan).toBe(1);
       await http
         .post('/muon-tra/gia-han')
         .set(auth(readerA))
-        .send({ maBanSach: `${ids.s1}-1`, soNgay: 3 })
+        .send({ maBanSach: bs.s1[0], soNgay: 3 })
         .expect(422);
     });
 
@@ -235,7 +297,7 @@ describe('Library API (e2e)', () => {
       const res = await http
         .post('/muon-tra/tra')
         .set(auth(admin))
-        .send({ maBanSach: `${ids.s1}-1` })
+        .send({ maBanSach: bs.s1[0] })
         .expect(200);
       expect(res.body.ngayTra).toBeTruthy();
       expect(res.body.phieuPhats).toHaveLength(0);
@@ -244,18 +306,29 @@ describe('Library API (e2e)', () => {
         .set(auth(admin))
         .expect(200);
       expect(phieu.body.trangThai).toBe('HOAN_TAT');
+
+      const lichSu = await http
+        .get('/me/lich-su-muon')
+        .set(auth(readerA))
+        .expect(200);
+      const luot = lichSu.body.find(
+        (r: { ma_ban_sach: string }) => r.ma_ban_sach === bs.s1[0],
+      );
+      expect(luot.ngay_tra).toBeTruthy();
+      expect(luot.so_lan_gia_han).toBe(1);
+      expect(luot.tinh_trang_tra).toBe('BINH_THUONG');
     });
 
     it('làm mất sách -> phiếu phạt MAT_SACH, chặn mượn tiếp, thanh toán xong được mượn lại', async () => {
       await http
         .post('/phieu-muon')
         .set(auth(admin))
-        .send({ maNguoiDung: READER_A, maBanSachs: [`${ids.s1}-2`] })
+        .send({ maNguoiDung: READER_A, maBanSachs: [bs.s1[1]] })
         .expect(201);
       const tra = await http
         .post('/muon-tra/tra')
         .set(auth(admin))
-        .send({ maBanSach: `${ids.s1}-2`, tinhTrang: 'MAT' })
+        .send({ maBanSach: bs.s1[1], tinhTrang: 'MAT' })
         .expect(200);
       const phat = tra.body.phieuPhats[0];
       expect(phat.loaiPhat).toBe('MAT_SACH');
@@ -273,7 +346,7 @@ describe('Library API (e2e)', () => {
       await http
         .post('/phieu-muon')
         .set(auth(admin))
-        .send({ maNguoiDung: READER_A, maBanSachs: [`${ids.s2}-1`] })
+        .send({ maNguoiDung: READER_A, maBanSachs: [bs.s2[0]] })
         .expect(422);
 
       await http
@@ -289,7 +362,7 @@ describe('Library API (e2e)', () => {
       await http
         .post('/phieu-muon')
         .set(auth(admin))
-        .send({ maNguoiDung: READER_A, maBanSachs: [`${ids.s2}-1`] })
+        .send({ maNguoiDung: READER_A, maBanSachs: [bs.s2[0]] })
         .expect(201);
     });
   });
@@ -318,6 +391,16 @@ describe('Library API (e2e)', () => {
       expect(res.body.trangThai).toBe('CHO_XU_LY');
       expect(res.body.nguoiDung.maNguoiDung).toBe(READER_B);
 
+      const meDat = await http
+        .get('/me/dat-truoc')
+        .set(auth(readerB))
+        .expect(200);
+      expect(meDat.body[0]).toMatchObject({
+        ma_sach: ids.s2,
+        trang_thai: 'CHO_XU_LY',
+        thu_tu_cho: 1,
+      });
+
       const mine = await http.get('/dat-truoc').set(auth(readerB)).expect(200);
       expect(
         mine.body.data.every(
@@ -330,6 +413,65 @@ describe('Library API (e2e)', () => {
     });
   });
 
+  describe('trạng thái người dùng và tài khoản', () => {
+    it('tạm khóa bạn đọc khóa luôn tài khoản; mở lại người dùng không tự mở tài khoản', async () => {
+      const id = docgiaIds[READER_B];
+      const khoa = await http
+        .patch(`/docgia/${id}/trang-thai`)
+        .set(auth(thuThu))
+        .send({ trangThai: 'TAM_KHOA' })
+        .expect(200);
+      expect(khoa.body.taiKhoan.trangThai).toBe('KHOA');
+      await http
+        .post('/auth/login')
+        .send({ tenDangNhap: READER_B.toLowerCase(), matKhau: PASSWORD })
+        .expect(401);
+
+      // chỉ quản trị mở được tài khoản, và chỉ khi người dùng đã HOAT_DONG
+      await http
+        .patch(`/docgia/${id}/tai-khoan/trang-thai`)
+        .set(auth(thuThu))
+        .send({ trangThai: 'HOAT_DONG' })
+        .expect(403);
+      await http
+        .patch(`/docgia/${id}/tai-khoan/trang-thai`)
+        .set(auth(admin))
+        .send({ trangThai: 'HOAT_DONG' })
+        .expect(422);
+
+      const mo = await http
+        .patch(`/docgia/${id}/trang-thai`)
+        .set(auth(thuThu))
+        .send({ trangThai: 'HOAT_DONG' })
+        .expect(200);
+      expect(mo.body.taiKhoan.trangThai).toBe('KHOA');
+      await http
+        .patch(`/docgia/${id}/tai-khoan/trang-thai`)
+        .set(auth(admin))
+        .send({ trangThai: 'HOAT_DONG' })
+        .expect(200);
+      await login(READER_B.toLowerCase(), PASSWORD);
+    });
+
+    it('đổi sang trạng thái đang có -> 422; thủ thư không đổi được cán bộ', async () => {
+      await http
+        .patch(`/docgia/${docgiaIds[READER_B]}/trang-thai`)
+        .set(auth(thuThu))
+        .send({ trangThai: 'HOAT_DONG' })
+        .expect(422);
+      const canBo = await http
+        .get('/docgia')
+        .query({ loaiNguoiDung: 'CAN_BO', tuKhoa: 'AD001' })
+        .set(auth(thuThu))
+        .expect(200);
+      await http
+        .patch(`/docgia/${canBo.body.data[0].id}/trang-thai`)
+        .set(auth(thuThu))
+        .send({ trangThai: 'TAM_KHOA' })
+        .expect(403);
+    });
+  });
+
   describe('báo cáo', () => {
     it.each([
       'danh-muc-sach',
@@ -337,12 +479,35 @@ describe('Library API (e2e)', () => {
       'muon-qua-han',
       'nguoi-dung-vi-pham',
       'top-sach-muon-nhieu',
+      'thong-ke-tien-phat',
+      'lich-su-muon',
+      'dat-truoc',
     ])('GET /bao-cao/%s trả mảng', async (name) => {
       const res = await http
         .get(`/bao-cao/${name}`)
         .set(auth(admin))
         .expect(200);
       expect(Array.isArray(res.body)).toBe(true);
+    });
+
+    it('lọc lịch sử mượn và đặt trước theo người dùng', async () => {
+      const lichSu = await http
+        .get('/bao-cao/lich-su-muon')
+        .query({ maNguoiDung: READER_A })
+        .set(auth(admin))
+        .expect(200);
+      expect(lichSu.body.length).toBeGreaterThan(0);
+      expect(
+        lichSu.body.every(
+          (r: { ma_nguoi_dung: string }) => r.ma_nguoi_dung === READER_A,
+        ),
+      ).toBe(true);
+      const datTruoc = await http
+        .get('/bao-cao/dat-truoc')
+        .query({ maNguoiDung: READER_B, trangThai: 'HUY' })
+        .set(auth(admin))
+        .expect(200);
+      expect(datTruoc.body).toHaveLength(1);
     });
   });
 });
