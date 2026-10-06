@@ -35,3 +35,10 @@ export const TRA_CUU_SACH_COLUMNS = [
   'ngon_ngu',
   'so_ban_san_sang',
 ] as const;
+
+/** sp_them_ban_sach: danh sách bản vừa nhập */
+export const THEM_BAN_SACH_COLUMNS = [
+  'ma_ban_sach',
+  'vi_tri_ke',
+  'tinh_trang',
+] as const;

@@ -1,6 +1,7 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayUnique,
   IsArray,
   IsInt,
@@ -8,6 +9,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -35,15 +37,17 @@ export class CreateSachDto {
   @MaxLength(255)
   tenSach!: string;
 
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  theLoaiId!: number;
+  @Transform(trim)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(20)
+  maTheLoai!: string;
 
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  nxbId!: number;
+  @Transform(trim)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(20)
+  maNxb!: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -70,10 +74,16 @@ export class CreateSachDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(20)
   @ArrayUnique()
-  @Type(() => Number)
-  @IsInt({ each: true })
-  tacGiaIds?: number[];
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  @Matches(/^[^,]+$/, {
+    each: true,
+    message: 'maTacGias khong duoc chua dau phay',
+  })
+  @MaxLength(20, { each: true })
+  maTacGias?: string[];
 }
 
 export class UpdateSachDto extends PartialType(CreateSachDto) {}
@@ -86,22 +96,20 @@ export class TraCuuSachQueryDto extends PageQueryDto {
   tuKhoa?: string;
 }
 
+/** Nhập bản sách qua sp_them_ban_sach: mã BSnnn tự sinh, ngày nhập = hôm nay. */
 export class CreateBanSachDto {
-  @Transform(trim)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(30)
-  maBanSach!: string;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  soBan: number = 1;
 
+  @Transform(trim)
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
   viTriKe!: string;
-
-  /** yyyy-mm-dd */
-  @IsString()
-  @IsNotEmpty()
-  ngayNhap!: string;
 }
 
 export class CapNhatTinhTrangBanSachDto {

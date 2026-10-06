@@ -4,7 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { namedRows, TRA_CUU_SACH_COLUMNS } from '../common/call-rows.js';
+import {
+  namedRows,
+  THEM_BAN_SACH_COLUMNS,
+  TRA_CUU_SACH_COLUMNS,
+} from '../common/call-rows.js';
 import { paginate, skipTake } from '../common/dto/page-query.dto.js';
 import type { AuthUser } from '../common/decorators/current-user.decorator.js';
 import { TinhTrangBanSach } from '../common/db-enums.js';
@@ -21,9 +25,12 @@ import {
 export class SachService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Có từ khóa: gọi sp_tra_cuu_sach (ghi nhật ký tra cứu). Không có: đọc vw_tra_cuu_sach có phân trang. */
+  /**
+   * Có từ khóa: gọi sp_tra_cuu_sach (ghi nhật ký tra cứu; % _ \ hiểu theo nghĩa đen). Không có (hoặc chỉ toàn
+   * khoảng trắng, procedure sẽ trả tập rỗng): đọc vw_tra_cuu_sach có phân trang.
+   */
   async traCuu(q: TraCuuSachQueryDto, user: AuthUser) {
-    if (q.tuKhoa) {
+    if (q.tuKhoa?.trim()) {
       const rows = await this.prisma.$queryRaw<
         Record<string, unknown>[]
       >`CALL sp_tra_cuu_sach(${q.tuKhoa}, ${user.maNguoiDung})`;
@@ -58,34 +65,53 @@ export class SachService {
     return sach;
   }
 
-  create(dto: CreateSachDto) {
-    const { tacGiaIds, theLoaiId, nxbId, ...rest } = dto;
-    return this.prisma.sach.create({
-      data: {
-        ...rest,
-        theLoaiId: BigInt(theLoaiId),
-        nxbId: BigInt(nxbId),
-        sachTacGias: {
-          create: (tacGiaIds ?? []).map((id) => ({ tacGiaId: BigInt(id) })),
-        },
-      },
+  /** Thêm đầu sách qua sp_them_sach: mã thể loại/NXB/tác giả sai thì không thêm gì (422). */
+  async create(dto: CreateSachDto) {
+    await this.prisma.$executeRaw`CALL sp_them_sach(
+      ${dto.maSach}, ${dto.isbn ?? null}, ${dto.tenSach}, ${dto.maTheLoai}, ${dto.maNxb},
+      ${dto.namXuatBan ?? null}, ${dto.ngonNgu ?? null}, ${dto.giaBia ?? null}, ${dto.moTa ?? null},
+      ${(dto.maTacGias ?? []).join(',')})`;
+    return this.prisma.sach.findUniqueOrThrow({
+      where: { maSach: dto.maSach },
+      include: { sachTacGias: { include: { tacGia: true } } },
     });
   }
 
   async update(id: bigint, dto: UpdateSachDto) {
-    const { tacGiaIds, theLoaiId, nxbId, ...rest } = dto;
+    const { maTacGias, maTheLoai, maNxb, ...rest } = dto;
     const data: Prisma.SachUncheckedUpdateInput = { ...rest };
-    if (theLoaiId !== undefined) data.theLoaiId = BigInt(theLoaiId);
-    if (nxbId !== undefined) data.nxbId = BigInt(nxbId);
+    if (maTheLoai !== undefined) {
+      const tl = await this.prisma.theLoai.findUnique({ where: { maTheLoai } });
+      if (!tl)
+        throw new NotFoundException(`Khong tim thay the loai: ${maTheLoai}`);
+      data.theLoaiId = tl.id;
+    }
+    if (maNxb !== undefined) {
+      const nxb = await this.prisma.nhaXuatBan.findUnique({ where: { maNxb } });
+      if (!nxb) throw new NotFoundException(`Khong tim thay NXB: ${maNxb}`);
+      data.nxbId = nxb.id;
+    }
+    let tacGiaIds: bigint[] | undefined;
+    if (maTacGias) {
+      const tacGias = await this.prisma.tacGia.findMany({
+        where: { maTacGia: { in: maTacGias } },
+        select: { id: true, maTacGia: true },
+      });
+      const thieu = maTacGias.filter(
+        (ma) => !tacGias.some((tg) => tg.maTacGia === ma),
+      );
+      if (thieu.length)
+        throw new NotFoundException(
+          `Khong tim thay tac gia: ${thieu.join(',')}`,
+        );
+      tacGiaIds = tacGias.map((tg) => tg.id);
+    }
 
     return this.prisma.$transaction(async (tx) => {
       if (tacGiaIds) {
         await tx.sachTacGia.deleteMany({ where: { sachId: id } });
         await tx.sachTacGia.createMany({
-          data: tacGiaIds.map((tacGiaId) => ({
-            sachId: id,
-            tacGiaId: BigInt(tacGiaId),
-          })),
+          data: tacGiaIds.map((tacGiaId) => ({ sachId: id, tacGiaId })),
         });
       }
       return tx.sach.update({ where: { id }, data });
@@ -107,18 +133,13 @@ export class SachService {
     });
   }
 
-  async createBanSach(sachId: bigint, dto: CreateBanSachDto) {
-    const ngayNhap = new Date(dto.ngayNhap);
-    if (Number.isNaN(ngayNhap.getTime()))
-      throw new BadRequestException('ngayNhap khong hop le (yyyy-mm-dd)');
-    return this.prisma.banSach.create({
-      data: {
-        sachId,
-        maBanSach: dto.maBanSach,
-        viTriKe: dto.viTriKe,
-        ngayNhap,
-      },
-    });
+  /** Nhập bản sách qua sp_them_ban_sach (mã BSnnn tự sinh; bản mới tự được giữ nếu đầu sách có người chờ). */
+  async createBanSach(sachId: bigint, { soBan, viTriKe }: CreateBanSachDto) {
+    const { maSach } = await this.findOne(sachId);
+    const rows = await this.prisma.$queryRaw<
+      Record<string, unknown>[]
+    >`CALL sp_them_ban_sach(${maSach}, ${soBan}, ${viTriKe})`;
+    return namedRows(rows, THEM_BAN_SACH_COLUMNS);
   }
 
   /** Đổi tình trạng qua sp_cap_nhat_tinh_trang_ban_sach (DB kiểm tra chuyển trạng thái hợp lệ). */
