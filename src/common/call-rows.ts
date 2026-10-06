@@ -21,7 +21,9 @@ export function namedRows<T extends string>(
   });
 }
 
-// Cột trả về của các procedure có result set (sql/04_procedures.sql)
+// Cột trả về của các procedure có result set mà BE gọi (sql/04_procedures.sql)
+
+/** sp_tra_cuu_sach: SELECT v.* FROM vw_tra_cuu_sach (sql/07_reports.sql) */
 export const TRA_CUU_SACH_COLUMNS = [
   'ma_sach',
   'isbn',
@@ -32,24 +34,4 @@ export const TRA_CUU_SACH_COLUMNS = [
   'nam_xuat_ban',
   'ngon_ngu',
   'so_ban_san_sang',
-] as const;
-
-export const SACH_DANG_MUON_COLUMNS = [
-  'ma_phieu',
-  'ma_ban_sach',
-  'ma_sach',
-  'ten_sach',
-  'ngay_muon',
-  'han_tra',
-  'so_ngay_qua_han',
-] as const;
-
-export const TIEN_PHAT_COLUMNS = [
-  'ma_phieu_phat',
-  'loai_phat',
-  'so_tien',
-  'ly_do',
-  'trang_thai',
-  'ngay_tao',
-  'ngay_thanh_toan',
 ] as const;
