@@ -16,6 +16,7 @@ import {
 } from 'class-validator';
 import { TinhTrangBanSach } from '../../common/db-enums.js';
 import { PageQueryDto } from '../../common/dto/page-query.dto.js';
+import { SapXepParam } from '../../common/dto/sap-xep.js';
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -89,12 +90,22 @@ export class CreateSachDto {
 
 export class UpdateSachDto extends PartialType(CreateSachDto) {}
 
+export const SACH_SAP_XEP = [
+  'tenSach',
+  'maSach',
+  'namXuatBan',
+  'soBanSanSang',
+] as const;
+
 export class TraCuuSachQueryDto extends PageQueryDto {
   @IsOptional()
   @Transform(trim)
   @IsString()
   @MaxLength(255)
   tuKhoa?: string;
+
+  @SapXepParam(SACH_SAP_XEP)
+  sapXep?: string;
 }
 
 /** Nhập bản sách qua sp_them_ban_sach: mã BSnnn tự sinh, ngày nhập = hôm nay. */

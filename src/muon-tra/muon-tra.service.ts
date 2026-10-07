@@ -12,9 +12,11 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import {
   GiaHanDto,
   ListPhieuMuonQueryDto,
+  PHIEU_MUON_SAP_XEP,
   TaoPhieuMuonDto,
   TraSachDto,
 } from './dto/muon-tra.dto.js';
+import { parseSapXep } from '../common/dto/sap-xep.js';
 
 const PHIEU_INCLUDE = {
   nguoiDung: { select: { maNguoiDung: true, hoTen: true } },
@@ -56,6 +58,7 @@ export class MuonTraService {
   }
 
   async list(q: ListPhieuMuonQueryDto) {
+    const sx = parseSapXep<(typeof PHIEU_MUON_SAP_XEP)[number]>(q.sapXep);
     const where: Prisma.PhieuMuonWhereInput = {
       trangThai: q.trangThai,
       nguoiDung: q.maNguoiDung ? { maNguoiDung: q.maNguoiDung } : undefined,
@@ -64,8 +67,10 @@ export class MuonTraService {
       this.prisma.phieuMuon.findMany({
         where,
         include: PHIEU_INCLUDE,
-        // id không theo ngày nghiệp vụ (dữ liệu nhập bù/seed): xếp theo ngày mượn, id làm khóa phụ
-        orderBy: [{ ngayMuon: 'desc' }, { id: 'desc' }],
+        orderBy: sx
+          ? [{ [sx.field]: sx.dir }, { id: sx.dir }]
+          : // id không theo ngày nghiệp vụ (dữ liệu nhập bù/seed): xếp theo ngày mượn, id làm khóa phụ
+            [{ ngayMuon: 'desc' }, { id: 'desc' }],
         ...skipTake(q),
       }),
       this.prisma.phieuMuon.count({ where }),

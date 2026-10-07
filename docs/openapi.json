@@ -243,6 +243,17 @@
             }
           },
           {
+            "name": "sapXep",
+            "required": false,
+            "in": "query",
+            "description": "Sắp xếp theo một cột: `<field>:<asc|desc>`, field thuộc: `maNguoiDung`, `hoTen`. Bỏ trống thì dùng thứ tự mặc định của endpoint. Khóa phụ cố định luôn được nối thêm để phân trang không lệch.",
+            "schema": {
+              "pattern": "^(maNguoiDung|hoTen):(asc|desc)$",
+              "example": "maNguoiDung:desc",
+              "type": "string"
+            }
+          },
+          {
             "name": "tuKhoa",
             "required": false,
             "in": "query",
@@ -2567,6 +2578,17 @@
             }
           },
           {
+            "name": "sapXep",
+            "required": false,
+            "in": "query",
+            "description": "Sắp xếp theo một cột: `<field>:<asc|desc>`, field thuộc: `tenSach`, `maSach`, `namXuatBan`, `soBanSanSang`. Bỏ trống thì dùng thứ tự mặc định của endpoint. Khóa phụ cố định luôn được nối thêm để phân trang không lệch.",
+            "schema": {
+              "pattern": "^(tenSach|maSach|namXuatBan|soBanSanSang):(asc|desc)$",
+              "example": "tenSach:desc",
+              "type": "string"
+            }
+          },
+          {
             "name": "tuKhoa",
             "required": false,
             "in": "query",
@@ -3546,6 +3568,17 @@
             }
           },
           {
+            "name": "sapXep",
+            "required": false,
+            "in": "query",
+            "description": "Sắp xếp theo một cột: `<field>:<asc|desc>`, field thuộc: `ngayMuon`, `maPhieu`. Bỏ trống thì dùng thứ tự mặc định của endpoint. Khóa phụ cố định luôn được nối thêm để phân trang không lệch.",
+            "schema": {
+              "pattern": "^(ngayMuon|maPhieu):(asc|desc)$",
+              "example": "ngayMuon:desc",
+              "type": "string"
+            }
+          },
+          {
             "name": "trangThai",
             "required": false,
             "in": "query",
@@ -4134,6 +4167,17 @@
             }
           },
           {
+            "name": "sapXep",
+            "required": false,
+            "in": "query",
+            "description": "Sắp xếp theo một cột: `<field>:<asc|desc>`, field thuộc: `ngayDat`, `hanGiu`. Bỏ trống thì dùng thứ tự mặc định của endpoint. Khóa phụ cố định luôn được nối thêm để phân trang không lệch.",
+            "schema": {
+              "pattern": "^(ngayDat|hanGiu):(asc|desc)$",
+              "example": "ngayDat:desc",
+              "type": "string"
+            }
+          },
+          {
             "name": "trangThai",
             "required": false,
             "in": "query",
@@ -4359,6 +4403,17 @@
               "maximum": 100,
               "default": 20,
               "type": "integer"
+            }
+          },
+          {
+            "name": "sapXep",
+            "required": false,
+            "in": "query",
+            "description": "Sắp xếp theo một cột: `<field>:<asc|desc>`, field thuộc: `ngayTao`, `soTien`. Bỏ trống thì dùng thứ tự mặc định của endpoint. Khóa phụ cố định luôn được nối thêm để phân trang không lệch.",
+            "schema": {
+              "pattern": "^(ngayTao|soTien):(asc|desc)$",
+              "example": "ngayTao:desc",
+              "type": "string"
             }
           },
           {

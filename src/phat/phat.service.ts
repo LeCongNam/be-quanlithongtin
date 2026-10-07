@@ -4,7 +4,8 @@ import { paginate, skipTake } from '../common/dto/page-query.dto.js';
 import { TrangThaiPhieuPhat } from '../common/db-enums.js';
 import { pagePriorityFirst } from '../common/priority-page.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { ListPhatQueryDto } from './dto/phat.dto.js';
+import { ListPhatQueryDto, PHAT_SAP_XEP } from './dto/phat.dto.js';
+import { parseSapXep } from '../common/dto/sap-xep.js';
 
 const INCLUDE = {
   ctPhieuMuon: {
@@ -38,6 +39,20 @@ export class PhatService {
         ? { phieuMuon: { nguoiDung: { maNguoiDung: q.maNguoiDung } } }
         : undefined,
     };
+    const sx = parseSapXep<(typeof PHAT_SAP_XEP)[number]>(q.sapXep);
+    if (sx) {
+      // Người dùng chọn cột: sort thuần theo cột, không ưu tiên nhóm
+      const [data, total] = await Promise.all([
+        this.prisma.phieuPhat.findMany({
+          where,
+          include: INCLUDE,
+          orderBy: [{ [sx.field]: sx.dir }, { id: sx.dir }],
+          ...skipTake(q),
+        }),
+        this.prisma.phieuPhat.count({ where }),
+      ]);
+      return paginate(data, total, q);
+    }
     // Phiếu chưa thu là việc cần thao tác "Thu tiền": đứng trước dù là phiếu cũ
     const chuaThu: Prisma.PhieuPhatWhereInput = {
       AND: [where, { trangThai: TrangThaiPhieuPhat.CHUA_THANH_TOAN }],

@@ -20,6 +20,7 @@ Tài khoản seed: `ad001` (ADMIN), `cb001`, `cb002` (THU_THU), `sv001`–`sv008
 
 - Khóa chính BIGINT (`id`) là **chuỗi** (`"13"`); tham số đường dẫn như `/sach/{id}` cũng là chuỗi số. Khi gọi API nghiệp vụ dùng **mã** (`maSach`, `maBanSach`, `maNguoiDung`, `maPhieu`), không dùng `id`.
 - Danh sách có phân trang trả `{ data, total, page, limit }`; query `page` (từ 1) và `limit` (tối đa 100) đều tùy chọn.
+- Sắp xếp: `sapXep=<field>:<asc|desc>` (tùy chọn) ở `/sach` (`tenSach`, `maSach`, `namXuatBan`, `soBanSanSang`), `/docgia` (`maNguoiDung`, `hoTen`), `/phieu-muon` (`ngayMuon`, `maPhieu`), `/phat` (`ngayTao`, `soTien`), `/dat-truoc` (`ngayDat`, `hanGiu`). Field ngoài danh sách trả 400. Không truyền thì dùng thứ tự mặc định trong mô tả từng endpoint; `/phat` và `/dat-truoc` mặc định đưa nhóm cần xử lý lên trước, còn khi có `sapXep` thì sort thuần theo cột. Ô trống (vd. `hanGiu`) luôn nằm cuối.
 - Ngày kiểu DATE trả dạng ISO `2026-10-07T00:00:00.000Z`; hiển thị theo ngày, không đổi múi giờ.
 - Báo cáo (`/bao-cao/*`), `GET /sach` và `/me/*` giữ tên cột **snake_case** của view; các endpoint còn lại là camelCase.
 - Số đếm và tiền VND trong báo cáo và `/me` là number. `soTien`, `giaBia` đọc từ bảng là chuỗi thập phân.

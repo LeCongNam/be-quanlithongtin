@@ -11,6 +11,7 @@ import {
   TRA_CUU_SACH_COLUMNS,
 } from '../common/call-rows.js';
 import { paginate, skipTake } from '../common/dto/page-query.dto.js';
+import { parseSapXep, type SapXep } from '../common/dto/sap-xep.js';
 import type { AuthUser } from '../common/decorators/current-user.decorator.js';
 import { TinhTrangBanSach } from '../common/db-enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -18,9 +19,46 @@ import {
   CapNhatTinhTrangBanSachDto,
   CreateBanSachDto,
   CreateSachDto,
+  SACH_SAP_XEP,
   TraCuuSachQueryDto,
   UpdateSachDto,
 } from './dto/sach.dto.js';
+
+type CotSapXep = (typeof SACH_SAP_XEP)[number];
+
+/** Field `sapXep` -> cột của `vw_tra_cuu_sach`; chỉ giá trị trong bảng này mới được nối vào câu SQL. */
+const COT_SACH = {
+  tenSach: 'ten_sach',
+  maSach: 'ma_sach',
+  namXuatBan: 'nam_xuat_ban',
+  soBanSanSang: 'so_ban_san_sang',
+} as const satisfies Record<CotSapXep, string>;
+
+const COLLATOR_VI = new Intl.Collator('vi', { numeric: true });
+
+/** Sort kết quả của sp_tra_cuu_sach (không phân trang): ô trống luôn cuối, hòa thì theo ma_sach. */
+export function sortKetQuaTraCuu<T extends Record<string, unknown>>(
+  rows: T[],
+  { field, dir }: SapXep<CotSapXep>,
+) {
+  const cot = COT_SACH[field];
+  const chieu = dir === 'desc' ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    const x = a[cot] as string | number | null;
+    const y = b[cot] as string | number | null;
+    if (x == null || y == null) {
+      if (x == null && y == null) return 0;
+      return x == null ? 1 : -1;
+    }
+    const cmp =
+      typeof x === 'number' && typeof y === 'number'
+        ? x - y
+        : COLLATOR_VI.compare(String(x), String(y));
+    return (
+      cmp * chieu || COLLATOR_VI.compare(String(a.ma_sach), String(b.ma_sach))
+    );
+  });
+}
 
 @Injectable()
 export class SachService {
@@ -31,23 +69,31 @@ export class SachService {
    * khoảng trắng, procedure sẽ trả tập rỗng): đọc vw_tra_cuu_sach có phân trang.
    */
   async traCuu(q: TraCuuSachQueryDto, user: AuthUser) {
+    const sx = parseSapXep<CotSapXep>(q.sapXep);
     if (q.tuKhoa?.trim()) {
       const rows = await this.prisma.$queryRaw<
         Record<string, unknown>[]
       >`CALL sp_tra_cuu_sach(${q.tuKhoa}, ${user.maNguoiDung})`;
-      const data = await this.kemId(
+      const found = await this.kemId(
         namedRows(rows, TRA_CUU_SACH_COLUMNS, [
           'nam_xuat_ban',
           'so_ban_san_sang',
         ]),
       );
+      const data = sx ? sortKetQuaTraCuu(found, sx) : found;
       return { data, total: data.length, page: 1, limit: data.length };
     }
     const { skip, take } = skipTake(q);
+    // Chỉ nối vào SQL các chuỗi lấy từ COT_SACH (whitelist), không bao giờ chuỗi từ client
+    const order = sx
+      ? Prisma.raw(
+          `${sx.field === 'namXuatBan' ? 'nam_xuat_ban IS NULL, ' : ''}${COT_SACH[sx.field]} ${sx.dir === 'desc' ? 'DESC' : 'ASC'}, ma_sach`,
+        )
+      : Prisma.raw('ten_sach, ma_sach');
     const [rows, [{ total }]] = await Promise.all([
       this.prisma.$queryRaw<
         Record<string, unknown>[]
-      >`SELECT * FROM vw_tra_cuu_sach ORDER BY ten_sach, ma_sach LIMIT ${take} OFFSET ${skip}`,
+      >`SELECT * FROM vw_tra_cuu_sach ORDER BY ${order} LIMIT ${take} OFFSET ${skip}`,
       this.prisma.$queryRaw<
         { total: bigint }[]
       >`SELECT COUNT(*) AS total FROM vw_tra_cuu_sach`,

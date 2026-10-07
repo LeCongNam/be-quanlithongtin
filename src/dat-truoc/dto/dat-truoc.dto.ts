@@ -8,6 +8,7 @@ import {
 } from 'class-validator';
 import { PageQueryDto } from '../../common/dto/page-query.dto.js';
 import { TrangThaiDatTruoc } from '../../common/db-enums.js';
+import { SapXepParam } from '../../common/dto/sap-xep.js';
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -34,6 +35,8 @@ export class HuyDatTruocQueryDto {
   maNguoiDung?: string;
 }
 
+export const DAT_TRUOC_SAP_XEP = ['ngayDat', 'hanGiu'] as const;
+
 export class ListDatTruocQueryDto extends PageQueryDto {
   @IsOptional()
   @IsEnum(TrangThaiDatTruoc)
@@ -43,4 +46,7 @@ export class ListDatTruocQueryDto extends PageQueryDto {
   @IsString()
   @MaxLength(20)
   maNguoiDung?: string;
+
+  @SapXepParam(DAT_TRUOC_SAP_XEP)
+  sapXep?: string;
 }

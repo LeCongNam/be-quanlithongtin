@@ -16,6 +16,7 @@ import {
 } from 'class-validator';
 import { PageQueryDto } from '../../common/dto/page-query.dto.js';
 import { TinhTrangTra, TrangThaiPhieuMuon } from '../../common/db-enums.js';
+import { SapXepParam } from '../../common/dto/sap-xep.js';
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -68,6 +69,8 @@ export class GiaHanDto {
   soNgay!: number;
 }
 
+export const PHIEU_MUON_SAP_XEP = ['ngayMuon', 'maPhieu'] as const;
+
 export class ListPhieuMuonQueryDto extends PageQueryDto {
   @IsOptional()
   @IsEnum(TrangThaiPhieuMuon)
@@ -77,4 +80,7 @@ export class ListPhieuMuonQueryDto extends PageQueryDto {
   @IsString()
   @MaxLength(20)
   maNguoiDung?: string;
+
+  @SapXepParam(PHIEU_MUON_SAP_XEP)
+  sapXep?: string;
 }

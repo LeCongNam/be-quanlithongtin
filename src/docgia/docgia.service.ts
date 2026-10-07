@@ -18,8 +18,9 @@ import type { AuthUser } from '../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateDocgiaDto } from './dto/create-docgia.dto.js';
 import { CreateTaiKhoanDto } from './dto/create-tai-khoan.dto.js';
-import { ListDocgiaQueryDto } from './dto/docgia-query.dto.js';
+import { DOCGIA_SAP_XEP, ListDocgiaQueryDto } from './dto/docgia-query.dto.js';
 import { UpdateDocgiaDto } from './dto/update-docgia.dto.js';
+import { parseSapXep } from '../common/dto/sap-xep.js';
 
 // Không bao giờ trả mat_khau_hash / muoi ra ngoài.
 const TAI_KHOAN_PUBLIC = {
@@ -44,6 +45,7 @@ export class DocgiaService {
   }
 
   async findAll(q: ListDocgiaQueryDto) {
+    const sx = parseSapXep<(typeof DOCGIA_SAP_XEP)[number]>(q.sapXep);
     const where: Prisma.NguoiDungWhereInput = {
       loaiNguoiDung: q.loaiNguoiDung,
       trangThai: q.trangThai,
@@ -58,7 +60,9 @@ export class DocgiaService {
     const [data, total] = await Promise.all([
       this.prisma.nguoiDung.findMany({
         where,
-        orderBy: { maNguoiDung: 'asc' },
+        orderBy: sx
+          ? [{ [sx.field]: sx.dir }, { id: sx.dir }]
+          : { maNguoiDung: 'asc' },
         ...skipTake(q),
       }),
       this.prisma.nguoiDung.count({ where }),

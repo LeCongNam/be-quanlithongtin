@@ -6,7 +6,12 @@ import { paginate, skipTake } from '../common/dto/page-query.dto.js';
 import { TrangThaiDatTruoc } from '../common/db-enums.js';
 import { pagePriorityFirst } from '../common/priority-page.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { DatTruocDto, ListDatTruocQueryDto } from './dto/dat-truoc.dto.js';
+import {
+  DAT_TRUOC_SAP_XEP,
+  DatTruocDto,
+  ListDatTruocQueryDto,
+} from './dto/dat-truoc.dto.js';
+import { parseSapXep } from '../common/dto/sap-xep.js';
 
 const INCLUDE = {
   sach: { select: { maSach: true, tenSach: true } },
@@ -14,10 +19,7 @@ const INCLUDE = {
 } satisfies Prisma.DatTruocInclude;
 
 /** Lượt còn hiệu lực (đang chờ / sẵn sàng nhận): đứng trước các lượt đã đóng, giống `/me/dat-truoc`. */
-const DANG_CHO = [
-  TrangThaiDatTruoc.CHO_XU_LY,
-  TrangThaiDatTruoc.SAN_SANG_NHAN,
-];
+const DANG_CHO = [TrangThaiDatTruoc.CHO_XU_LY, TrangThaiDatTruoc.SAN_SANG_NHAN];
 const MOI_NHAT_TRUOC = [
   { ngayDat: 'desc' },
   { id: 'desc' },
@@ -59,6 +61,24 @@ export class DatTruocService {
           : undefined
         : { maNguoiDung: user.maNguoiDung },
     };
+    const sx = parseSapXep<(typeof DAT_TRUOC_SAP_XEP)[number]>(q.sapXep);
+    if (sx) {
+      // Người dùng chọn cột: sort thuần theo cột, không ưu tiên nhóm; hạn giữ trống (NULL) luôn cuối
+      const cot =
+        sx.field === 'hanGiu'
+          ? { hanGiu: { sort: sx.dir, nulls: 'last' as const } }
+          : { [sx.field]: sx.dir };
+      const [data, total] = await Promise.all([
+        this.prisma.datTruoc.findMany({
+          where,
+          include: INCLUDE,
+          orderBy: [cot, { id: sx.dir }],
+          ...skipTake(q),
+        }),
+        this.prisma.datTruoc.count({ where }),
+      ]);
+      return paginate(data, total, q);
+    }
     const dangCho: Prisma.DatTruocWhereInput = {
       AND: [where, { trangThai: { in: DANG_CHO } }],
     };
