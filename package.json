@@ -14,6 +14,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
+    "openapi:export": "nest build && node dist/export-openapi.js docs/openapi.json",
     "prisma:generate": "prisma generate",
     "prisma:pull": "prisma db pull",
     "lint": "oxlint --type-aware src/ test/",

@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -43,6 +44,12 @@ export class TraSachDto {
   @MaxLength(30)
   maBanSach!: string;
 
+  /** Tình trạng sách khi trả; HU_HONG/MAT sinh phiếu phạt. Mặc định BINH_THUONG. */
+  @ApiPropertyOptional({
+    enum: TinhTrangTra,
+    enumName: 'TinhTrangTra',
+    default: TinhTrangTra.BINH_THUONG,
+  })
   @IsEnum(TinhTrangTra)
   tinhTrang: TinhTrangTra = TinhTrangTra.BINH_THUONG;
 }

@@ -37,3 +37,15 @@ Không đổi hợp đồng API (chữ ký procedure, view, quyền giữ nguyê
 - Gia hạn (`POST /muon-tra/gia-han`): người chờ đang bị khóa, quá hạn hoặc nợ phạt không còn chặn người đang mượn gia hạn.
 - Bản sách trả về/nhập mới chỉ được giữ cho người chờ còn đủ điều kiện mượn; người không đủ điều kiện vẫn ở `CHO_XU_LY` và có `thu_tu_cho = null` trong `GET /me/dat-truoc` và `GET /bao-cao/dat-truoc`.
 - Dữ liệu mẫu đổi (nạp lại `99_full_setup.sql`): lượt chờ S004 đầu tiên là SV007 (đang tạm khóa) thay cho SV001; `BS012` đang giữ cho GV001 thay cho SV005.
+
+## Swagger đầy đủ, chuẩn hóa kiểu dữ liệu và xác thực hai tầng (2026-10-07)
+
+Hướng dẫn dùng Swagger cho FE: xem `docs/swagger-cho-fe.md`. Thay đổi hành vi FE cần biết:
+
+- **Kiểu số nhất quán.** Cột đếm/tiền của `GET /sach` (không có `tuKhoa`) và của mọi `GET /bao-cao/*` trước đây là **chuỗi** (`"3"`), nay là **number** như `GET /me/*` và `GET /sach?tuKhoa=`. `GET /me/tien-phat`: `so_tien` nay là number. Khóa chính (`id`, `ma_phieu_phat`) vẫn là chuỗi; `soTien`, `giaBia` đọc từ bảng (Prisma Decimal) vẫn là chuỗi thập phân.
+- **Xóa bản ghi đang được tham chiếu trả 409** (trước đây 500): `DELETE` thể loại, NXB, tác giả, sách còn dữ liệu liên quan; `DELETE /nha-xuat-ban/:id` khi NXB còn sách...
+- `DELETE /the-loai|nha-xuat-ban|tac-gia/:id` chỉ **ADMIN**; THU_THU nhận **403** (ẩn nút xóa với thủ thư).
+- Tài khoản bị khóa/ngừng mất quyền **ngay giữa phiên**: mọi API trả **401** `Tai khoan dang bi khoa hoac ngung hoat dong` dù JWT còn hạn. FE nên đăng xuất và về trang đăng nhập khi gặp 401.
+- `GET /auth/me` trả thêm `iat`, `exp` (giây Unix) để FE biết khi nào token hết hạn.
+- `GET /dat-truoc` trả thêm hai cột sinh tự động `khoaDangHoatDong`, `banSachDangGiu` (FE bỏ qua).
+- Bật CORS cho origin trong biến môi trường `CORS_ORIGINS` (mặc định `http://localhost:3001,http://localhost:3000`). FE gọi qua proxy `/backend` của Next thì không cần.

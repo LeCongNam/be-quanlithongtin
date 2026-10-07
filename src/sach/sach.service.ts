@@ -6,6 +6,7 @@ import {
 import { Prisma } from '@prisma/client';
 import {
   namedRows,
+  numberColumns,
   THEM_BAN_SACH_COLUMNS,
   TRA_CUU_SACH_COLUMNS,
 } from '../common/call-rows.js';
@@ -41,15 +42,15 @@ export class SachService {
       return { data, total: data.length, page: 1, limit: data.length };
     }
     const { skip, take } = skipTake(q);
-    const [data, [{ total }]] = await Promise.all([
+    const [rows, [{ total }]] = await Promise.all([
       this.prisma.$queryRaw<
-        unknown[]
+        Record<string, unknown>[]
       >`SELECT * FROM vw_tra_cuu_sach ORDER BY ten_sach LIMIT ${take} OFFSET ${skip}`,
       this.prisma.$queryRaw<
         { total: bigint }[]
       >`SELECT COUNT(*) AS total FROM vw_tra_cuu_sach`,
     ]);
-    return paginate(data, Number(total), q);
+    return paginate(numberColumns(rows, ['so_ban_san_sang']), Number(total), q);
   }
 
   async findOne(id: bigint) {

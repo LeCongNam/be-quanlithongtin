@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/mapped-types';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -14,6 +14,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { TinhTrangBanSach } from '../../common/db-enums.js';
 import { PageQueryDto } from '../../common/dto/page-query.dto.js';
 
 const trim = ({ value }: { value: unknown }) =>
@@ -98,6 +99,13 @@ export class TraCuuSachQueryDto extends PageQueryDto {
 
 /** Nhập bản sách qua sp_them_ban_sach: mã BSnnn tự sinh, ngày nhập = hôm nay. */
 export class CreateBanSachDto {
+  /** Số bản nhập (1–100), mặc định 1. */
+  @ApiPropertyOptional({
+    type: 'integer',
+    default: 1,
+    minimum: 1,
+    maximum: 100,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -113,6 +121,8 @@ export class CreateBanSachDto {
 }
 
 export class CapNhatTinhTrangBanSachDto {
+  /** Tình trạng đích; DB kiểm tra chuyển trạng thái có hợp lệ không. */
+  @ApiProperty({ enum: TinhTrangBanSach, enumName: 'TinhTrangBanSach' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(20)

@@ -14,6 +14,9 @@ const MYSQL_SIGNAL_CODE = '1644';
 // `MysqlError { code: 1644, message: "...", state: "45000" }`.
 const MYSQL_SIGNAL_IN_MESSAGE =
   /MysqlError \{ code: 1644, message: "((?:[^"\\]|\\.)*)"/;
+// Khóa ngoại: MySQL 8 báo 1217 (xóa/sửa dòng cha còn dòng con, FK NO ACTION) hoặc 1451; 1452 là thêm dòng con
+// không có dòng cha. Prisma không đổi các mã này sang P2003 nên đến dưới dạng lỗi không xác định.
+const MYSQL_FOREIGN_KEY_VIOLATION = /code: (?:1217|1451|1452)\b/;
 // MySQL 3819: vi phạm CHECK constraint.
 const MYSQL_CHECK_VIOLATION = /code: 3819/;
 
@@ -82,6 +85,11 @@ export class DatabaseExceptionFilter implements ExceptionFilter {
       return {
         status: HttpStatus.UNPROCESSABLE_ENTITY,
         message: MYSQL_SIGNAL_IN_MESSAGE.exec(exception.message)![1],
+      };
+    } else if (MYSQL_FOREIGN_KEY_VIOLATION.test(exception.message)) {
+      return {
+        status: HttpStatus.CONFLICT,
+        message: 'Vi pham rang buoc khoa ngoai',
       };
     } else if (MYSQL_CHECK_VIOLATION.test(exception.message)) {
       return {

@@ -59,6 +59,17 @@ describe('DatabaseExceptionFilter', () => {
     });
   });
 
+  it.each([1217, 1451, 1452])(
+    'khóa ngoại (MySQL %i) từ lỗi không xác định của Prisma -> 409',
+    (mysqlCode) => {
+      const err = new Prisma.PrismaClientUnknownRequestError(
+        `ConnectorError { kind: QueryError(Server(MysqlError { code: ${mysqlCode}, message: "Cannot delete or update a parent row: a foreign key constraint fails", state: "23000" })) }`,
+        { clientVersion: 'test' },
+      );
+      expect(run(err).statusCode).toBe(HttpStatus.CONFLICT);
+    },
+  );
+
   it('CHECK constraint bị vi phạm -> 400', () => {
     const err = new Prisma.PrismaClientUnknownRequestError(
       'MysqlError { code: 3819 }',

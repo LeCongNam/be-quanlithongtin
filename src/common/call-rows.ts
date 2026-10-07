@@ -42,3 +42,23 @@ export const THEM_BAN_SACH_COLUMNS = [
   'vi_tri_ke',
   'tinh_trang',
 ] as const;
+
+/**
+ * Ép các cột đếm/tổng của `$queryRaw` (BIGINT -> BigInt, DECIMAL -> Decimal, JSON hóa thành chuỗi)
+ * về number để mọi endpoint trả cùng một kiểu (như `namedRows` và /me/*). Chỉ dùng cho cột số đếm/tiền VND
+ * của view, không dùng cho khóa chính.
+ */
+export function numberColumns<T extends Record<string, unknown>>(
+  rows: T[],
+  columns: readonly string[],
+): T[] {
+  for (const row of rows) {
+    for (const col of columns) {
+      const value = row[col];
+      if (value !== null && value !== undefined) {
+        (row as Record<string, unknown>)[col] = Number(value);
+      }
+    }
+  }
+  return rows;
+}
