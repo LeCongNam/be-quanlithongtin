@@ -216,6 +216,35 @@ describe('Library API (e2e)', () => {
         .expect(200);
       expect(blank.body.total).toBeGreaterThan(0);
     });
+
+    it('tra bản sách theo mã và tìm theo tên: chỉ nhân viên, mã không có -> 404', async () => {
+      const ma = bs.s1[0];
+      const one = await http
+        .get(`/ban-sach/${ma.toLowerCase()}`)
+        .set(auth(admin))
+        .expect(200);
+      expect(one.body).toMatchObject({
+        maBanSach: ma,
+        maSach: ids.s1,
+        tenSach: `Sach test ${ids.s1}`,
+      });
+      await http.get('/ban-sach/KHONG-CO').set(auth(admin)).expect(404);
+      await http.get(`/ban-sach/${ma}`).set(auth(readerA)).expect(403);
+
+      const found = await http
+        .get('/ban-sach')
+        .query({ tuKhoa: `Sach test ${ids.s1}`, tinhTrang: 'SAN_SANG' })
+        .set(auth(admin))
+        .expect(200);
+      expect(found.body.map((b: { maBanSach: string }) => b.maBanSach)).toEqual(
+        expect.arrayContaining(bs.s1),
+      );
+      await http
+        .get('/ban-sach')
+        .query({ tinhTrang: 'KHONG' })
+        .set(auth(admin))
+        .expect(400);
+    });
   });
 
   describe('mượn - gia hạn - trả - phạt', () => {

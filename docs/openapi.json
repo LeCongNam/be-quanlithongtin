@@ -3338,6 +3338,238 @@
         ]
       }
     },
+    "/ban-sach": {
+      "get": {
+        "description": "Gợi ý khi lập phiếu mượn: `tuKhoa` khớp một phần mã bản hoặc tên sách, `tinhTrang` lọc (lặp tham số để chọn nhiều), tối đa `limit` dòng (mặc định 10, tối đa 50), xếp theo tên sách rồi mã bản. Không ghi nhật ký tra cứu.\n\n**Quyền:** `ADMIN`, `THU_THU`",
+        "operationId": "Sach_timBanSach",
+        "parameters": [
+          {
+            "name": "tuKhoa",
+            "required": false,
+            "in": "query",
+            "description": "Khớp một phần mã bản (`BS001`) hoặc tên sách; không phân biệt hoa thường, dấu.",
+            "schema": {
+              "maxLength": 255,
+              "example": "BS00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "tinhTrang",
+            "required": false,
+            "in": "query",
+            "description": "Chỉ lấy các tình trạng này (lặp tham số để chọn nhiều).",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/TinhTrangBanSach"
+              }
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Số dòng tối đa (1–50), mặc định 10.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BanSachKemSachDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dữ liệu gửi lên không hợp lệ (message là mảng lỗi validate) hoặc vi phạm CHECK của CSDL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu/sai/hết hạn JWT, hoặc tài khoản/người dùng đang bị khóa hay ngừng hoạt động",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Vai trò của tài khoản không được phép gọi endpoint này",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy bản ghi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Trùng giá trị duy nhất hoặc vi phạm khóa ngoại",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Vi phạm quy tắc nghiệp vụ do procedure/trigger của CSDL báo (message là thông báo của CSDL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tìm bản sách theo mã hoặc tên sách",
+        "tags": [
+          "sach"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "THU_THU"
+        ]
+      }
+    },
+    "/ban-sach/{maBanSach}": {
+      "get": {
+        "description": "Trả bản sách kèm mã sách, tên sách và tác giả. Mã không có thì 404; không phân biệt hoa thường.\n\n**Quyền:** `ADMIN`, `THU_THU`",
+        "operationId": "Sach_findBanSach",
+        "parameters": [
+          {
+            "name": "maBanSach",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BanSachKemSachDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dữ liệu gửi lên không hợp lệ (message là mảng lỗi validate) hoặc vi phạm CHECK của CSDL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu/sai/hết hạn JWT, hoặc tài khoản/người dùng đang bị khóa hay ngừng hoạt động",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Vai trò của tài khoản không được phép gọi endpoint này",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy bản ghi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Trùng giá trị duy nhất hoặc vi phạm khóa ngoại",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Vi phạm quy tắc nghiệp vụ do procedure/trigger của CSDL báo (message là thông báo của CSDL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tra một bản sách theo mã",
+        "tags": [
+          "sach"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "THU_THU"
+        ]
+      }
+    },
     "/ban-sach/{maBanSach}/tinh-trang": {
       "patch": {
         "description": "Qua `sp_cap_nhat_tinh_trang_ban_sach` (sửa xong, thanh lý, tìm lại...). DB kiểm tra chuyển trạng thái hợp lệ, sai thì 422.\n\n**Quyền:** `ADMIN`, `THU_THU`",
@@ -4072,7 +4304,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DatTruocDto"
+                "$ref": "#/components/schemas/TaoDatTruocDto"
               }
             }
           }
@@ -6370,6 +6602,11 @@
       "CreateTheLoaiDto": {
         "type": "object",
         "properties": {
+          "moTa": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true
+          },
           "maTheLoai": {
             "type": "string",
             "maxLength": 20
@@ -6377,10 +6614,6 @@
           "tenTheLoai": {
             "type": "string",
             "maxLength": 120
-          },
-          "moTa": {
-            "type": "string",
-            "maxLength": 255
           }
         },
         "required": [
@@ -6391,6 +6624,11 @@
       "UpdateTheLoaiDto": {
         "type": "object",
         "properties": {
+          "moTa": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true
+          },
           "maTheLoai": {
             "type": "string",
             "maxLength": 20
@@ -6398,10 +6636,6 @@
           "tenTheLoai": {
             "type": "string",
             "maxLength": 120
-          },
-          "moTa": {
-            "type": "string",
-            "maxLength": 255
           }
         }
       },
@@ -6445,6 +6679,22 @@
       "CreateNhaXuatBanDto": {
         "type": "object",
         "properties": {
+          "diaChi": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 120,
+            "format": "email",
+            "nullable": true
+          },
+          "sdt": {
+            "type": "string",
+            "maxLength": 20,
+            "nullable": true
+          },
           "maNxb": {
             "type": "string",
             "maxLength": 20
@@ -6452,19 +6702,6 @@
           "tenNxb": {
             "type": "string",
             "maxLength": 160
-          },
-          "diaChi": {
-            "type": "string",
-            "maxLength": 255
-          },
-          "email": {
-            "type": "string",
-            "maxLength": 120,
-            "format": "email"
-          },
-          "sdt": {
-            "type": "string",
-            "maxLength": 20
           }
         },
         "required": [
@@ -6475,6 +6712,22 @@
       "UpdateNhaXuatBanDto": {
         "type": "object",
         "properties": {
+          "diaChi": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 120,
+            "format": "email",
+            "nullable": true
+          },
+          "sdt": {
+            "type": "string",
+            "maxLength": 20,
+            "nullable": true
+          },
           "maNxb": {
             "type": "string",
             "maxLength": 20
@@ -6482,19 +6735,6 @@
           "tenNxb": {
             "type": "string",
             "maxLength": 160
-          },
-          "diaChi": {
-            "type": "string",
-            "maxLength": 255
-          },
-          "email": {
-            "type": "string",
-            "maxLength": 120,
-            "format": "email"
-          },
-          "sdt": {
-            "type": "string",
-            "maxLength": 20
           }
         }
       },
@@ -6533,6 +6773,17 @@
       "CreateTacGiaDto": {
         "type": "object",
         "properties": {
+          "quocTich": {
+            "type": "string",
+            "maxLength": 80,
+            "nullable": true
+          },
+          "namSinh": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999,
+            "nullable": true
+          },
           "maTacGia": {
             "type": "string",
             "maxLength": 20
@@ -6540,15 +6791,6 @@
           "tenTacGia": {
             "type": "string",
             "maxLength": 160
-          },
-          "quocTich": {
-            "type": "string",
-            "maxLength": 80
-          },
-          "namSinh": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 9999
           }
         },
         "required": [
@@ -6559,6 +6801,17 @@
       "UpdateTacGiaDto": {
         "type": "object",
         "properties": {
+          "quocTich": {
+            "type": "string",
+            "maxLength": 80,
+            "nullable": true
+          },
+          "namSinh": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999,
+            "nullable": true
+          },
           "maTacGia": {
             "type": "string",
             "maxLength": 20
@@ -6566,15 +6819,6 @@
           "tenTacGia": {
             "type": "string",
             "maxLength": 160
-          },
-          "quocTich": {
-            "type": "string",
-            "maxLength": 80
-          },
-          "namSinh": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 9999
           }
         }
       },
@@ -6739,11 +6983,27 @@
       "CreateSachDto": {
         "type": "object",
         "properties": {
-          "maSach": {
-            "type": "string",
-            "maxLength": 20
-          },
           "isbn": {
+            "type": "string",
+            "maxLength": 20,
+            "nullable": true
+          },
+          "namXuatBan": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999,
+            "nullable": true
+          },
+          "giaBia": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "moTa": {
+            "type": "string",
+            "nullable": true
+          },
+          "maSach": {
             "type": "string",
             "maxLength": 20
           },
@@ -6759,22 +7019,10 @@
             "type": "string",
             "maxLength": 20
           },
-          "namXuatBan": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 9999
-          },
           "ngonNgu": {
             "type": "string",
             "description": "Phải thuộc danh sách CHECK trong DB (Tiếng Việt, English, ...).",
             "maxLength": 50
-          },
-          "giaBia": {
-            "type": "number",
-            "minimum": 0
-          },
-          "moTa": {
-            "type": "string"
           },
           "maTacGias": {
             "uniqueItems": true,
@@ -6867,11 +7115,27 @@
       "UpdateSachDto": {
         "type": "object",
         "properties": {
-          "maSach": {
-            "type": "string",
-            "maxLength": 20
-          },
           "isbn": {
+            "type": "string",
+            "maxLength": 20,
+            "nullable": true
+          },
+          "namXuatBan": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999,
+            "nullable": true
+          },
+          "giaBia": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "moTa": {
+            "type": "string",
+            "nullable": true
+          },
+          "maSach": {
             "type": "string",
             "maxLength": 20
           },
@@ -6887,22 +7151,10 @@
             "type": "string",
             "maxLength": 20
           },
-          "namXuatBan": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 9999
-          },
           "ngonNgu": {
             "type": "string",
             "description": "Phải thuộc danh sách CHECK trong DB (Tiếng Việt, English, ...).",
             "maxLength": 50
-          },
-          "giaBia": {
-            "type": "number",
-            "minimum": 0
-          },
-          "moTa": {
-            "type": "string"
           },
           "maTacGias": {
             "uniqueItems": true,
@@ -7034,6 +7286,67 @@
           "viTriKe",
           "ngayNhap",
           "tinhTrang"
+        ]
+      },
+      "BanSachKemSachDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "1",
+            "nullable": false
+          },
+          "maBanSach": {
+            "type": "string",
+            "example": "BS001",
+            "description": "Mã bản sách (dùng khi mượn/trả/gia hạn)"
+          },
+          "sachId": {
+            "type": "string",
+            "example": "1",
+            "description": "sach.id",
+            "nullable": false
+          },
+          "viTriKe": {
+            "type": "string",
+            "example": "A1-03"
+          },
+          "ngayNhap": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Ngày nhập (kiểu DATE)"
+          },
+          "tinhTrang": {
+            "nullable": false,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TinhTrangBanSach"
+              }
+            ]
+          },
+          "maSach": {
+            "type": "string",
+            "example": "S001"
+          },
+          "tenSach": {
+            "type": "string"
+          },
+          "tacGia": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tên các tác giả, cách nhau bằng \", \""
+          }
+        },
+        "required": [
+          "id",
+          "maBanSach",
+          "sachId",
+          "viTriKe",
+          "ngayNhap",
+          "tinhTrang",
+          "maSach",
+          "tenSach",
+          "tacGia"
         ]
       },
       "CreateBanSachDto": {
@@ -7582,6 +7895,49 @@
           "phieuMuon"
         ]
       },
+      "TaoDatTruocDto": {
+        "type": "object",
+        "properties": {
+          "maSach": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "maNguoiDung": {
+            "type": "string",
+            "description": "Bạn đọc bỏ trống (lấy từ token). Thủ thư/admin đặt hộ thì bắt buộc.",
+            "maxLength": 20
+          }
+        },
+        "required": [
+          "maSach"
+        ]
+      },
+      "TrangThaiDatTruoc": {
+        "type": "string",
+        "enum": [
+          "CHO_XU_LY",
+          "SAN_SANG_NHAN",
+          "DA_NHAN",
+          "HUY",
+          "HET_HAN"
+        ]
+      },
+      "DatTruocSachDto": {
+        "type": "object",
+        "properties": {
+          "maSach": {
+            "type": "string",
+            "example": "S004"
+          },
+          "tenSach": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "maSach",
+          "tenSach"
+        ]
+      },
       "DatTruocDto": {
         "type": "object",
         "properties": {
@@ -7654,32 +8010,6 @@
           "banSachDangGiu",
           "sach",
           "nguoiDung"
-        ]
-      },
-      "TrangThaiDatTruoc": {
-        "type": "string",
-        "enum": [
-          "CHO_XU_LY",
-          "SAN_SANG_NHAN",
-          "DA_NHAN",
-          "HUY",
-          "HET_HAN"
-        ]
-      },
-      "DatTruocSachDto": {
-        "type": "object",
-        "properties": {
-          "maSach": {
-            "type": "string",
-            "example": "S004"
-          },
-          "tenSach": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "maSach",
-          "tenSach"
         ]
       },
       "HuyDatTruocKetQuaDto": {

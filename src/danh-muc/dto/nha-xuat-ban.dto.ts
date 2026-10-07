@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/swagger';
+import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
   IsEmail,
   IsNotEmpty,
@@ -18,16 +18,19 @@ export class CreateNhaXuatBanDto {
   @MaxLength(160)
   tenNxb!: string;
 
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(255)
   diaChi?: string;
 
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsEmail()
   @MaxLength(120)
   email?: string;
 
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(20)

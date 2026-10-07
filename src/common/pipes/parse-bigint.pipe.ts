@@ -5,7 +5,7 @@ import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
 export class ParseBigIntPipe implements PipeTransform<string, bigint> {
   transform(value: string): bigint {
     if (!/^\d{1,19}$/.test(value)) {
-      throw new BadRequestException('Id phai la so nguyen duong');
+      throw new BadRequestException('Id phải là số nguyên dương');
     }
     return BigInt(value);
   }

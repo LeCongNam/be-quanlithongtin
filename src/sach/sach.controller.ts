@@ -28,11 +28,13 @@ import {
   CapNhatTinhTrangBanSachDto,
   CreateBanSachDto,
   CreateSachDto,
+  TimBanSachQueryDto,
   TraCuuSachQueryDto,
   UpdateSachDto,
 } from './dto/sach.dto.js';
 import {
   BanSachDto,
+  BanSachKemSachDto,
   BanSachMoiDto,
   SachChiTietDto,
   SachCoTacGiaDto,
@@ -109,6 +111,30 @@ export class SachController {
   @ApiOkResponse({ type: [BanSachDto] })
   listBanSach(@Param('id', ParseBigIntPipe) id: bigint) {
     return this.service.listBanSach(id);
+  }
+
+  @Roles(...STAFF)
+  @Get('ban-sach')
+  @ApiOperation({
+    summary: 'Tìm bản sách theo mã hoặc tên sách',
+    description:
+      'Gợi ý khi lập phiếu mượn: `tuKhoa` khớp một phần mã bản hoặc tên sách, `tinhTrang` lọc (lặp tham số để chọn nhiều), tối đa `limit` dòng (mặc định 10, tối đa 50), xếp theo tên sách rồi mã bản. Không ghi nhật ký tra cứu.',
+  })
+  @ApiOkResponse({ type: [BanSachKemSachDto] })
+  timBanSach(@Query() q: TimBanSachQueryDto) {
+    return this.service.timBanSach(q);
+  }
+
+  @Roles(...STAFF)
+  @Get('ban-sach/:maBanSach')
+  @ApiOperation({
+    summary: 'Tra một bản sách theo mã',
+    description:
+      'Trả bản sách kèm mã sách, tên sách và tác giả. Mã không có thì 404; không phân biệt hoa thường.',
+  })
+  @ApiOkResponse({ type: BanSachKemSachDto })
+  findBanSach(@Param('maBanSach') maBanSach: string) {
+    return this.service.findBanSach(maBanSach);
   }
 
   @Roles(...STAFF)

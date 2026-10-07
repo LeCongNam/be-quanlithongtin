@@ -78,7 +78,7 @@ export class DatabaseExceptionFilter implements ExceptionFilter {
         case 'P2025':
           return {
             status: HttpStatus.NOT_FOUND,
-            message: 'Khong tim thay ban ghi',
+            message: 'Không tìm thấy bản ghi',
           };
       }
     } else if (MYSQL_SIGNAL_IN_MESSAGE.test(exception.message)) {

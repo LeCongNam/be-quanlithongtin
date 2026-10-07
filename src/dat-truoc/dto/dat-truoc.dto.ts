@@ -13,7 +13,8 @@ import { SapXepParam } from '../../common/dto/sap-xep.js';
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 
-export class DatTruocDto {
+/** Body của `POST /dat-truoc` (khác `DatTruocDto` ở file response, là lượt đặt trả về). */
+export class TaoDatTruocDto {
   @Transform(trim)
   @IsString()
   @IsNotEmpty()

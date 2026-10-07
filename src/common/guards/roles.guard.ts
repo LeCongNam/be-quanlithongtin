@@ -24,7 +24,7 @@ export class RolesGuard implements CanActivate {
       .switchToHttp()
       .getRequest<Request & { user?: AuthUser }>().user;
     if (!user || !roles.includes(user.vaiTro)) {
-      throw new ForbiddenException('Khong du quyen thuc hien thao tac nay');
+      throw new ForbiddenException('Không đủ quyền thực hiện thao tác này');
     }
     return true;
   }

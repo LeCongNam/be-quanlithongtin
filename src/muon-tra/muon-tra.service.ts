@@ -83,13 +83,13 @@ export class MuonTraService {
       where: { maPhieu },
       include: PHIEU_INCLUDE,
     });
-    if (!phieu) throw new NotFoundException('Khong tim thay phieu muon');
+    if (!phieu) throw new NotFoundException('Không tìm thấy phiếu mượn');
     if (
       user &&
       !isStaff(user) &&
       phieu.nguoiDung.maNguoiDung !== user.maNguoiDung
     ) {
-      throw new ForbiddenException('Khong co quyen xem phieu muon nay');
+      throw new ForbiddenException('Không có quyền xem phiếu mượn này');
     }
     return phieu;
   }

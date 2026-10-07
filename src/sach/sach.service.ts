@@ -20,6 +20,7 @@ import {
   CreateBanSachDto,
   CreateSachDto,
   SACH_SAP_XEP,
+  TimBanSachQueryDto,
   TraCuuSachQueryDto,
   UpdateSachDto,
 } from './dto/sach.dto.js';
@@ -122,7 +123,7 @@ export class SachService {
         sachTacGias: { include: { tacGia: true } },
       },
     });
-    if (!sach) throw new NotFoundException('Khong tim thay sach');
+    if (!sach) throw new NotFoundException('Không tìm thấy sách');
     return sach;
   }
 
@@ -144,12 +145,12 @@ export class SachService {
     if (maTheLoai !== undefined) {
       const tl = await this.prisma.theLoai.findUnique({ where: { maTheLoai } });
       if (!tl)
-        throw new NotFoundException(`Khong tim thay the loai: ${maTheLoai}`);
+        throw new NotFoundException(`Không tìm thấy thể loại: ${maTheLoai}`);
       data.theLoaiId = tl.id;
     }
     if (maNxb !== undefined) {
       const nxb = await this.prisma.nhaXuatBan.findUnique({ where: { maNxb } });
-      if (!nxb) throw new NotFoundException(`Khong tim thay NXB: ${maNxb}`);
+      if (!nxb) throw new NotFoundException(`Không tìm thấy NXB: ${maNxb}`);
       data.nxbId = nxb.id;
     }
     let tacGiaIds: bigint[] | undefined;
@@ -163,7 +164,7 @@ export class SachService {
       );
       if (thieu.length)
         throw new NotFoundException(
-          `Khong tim thay tac gia: ${thieu.join(',')}`,
+          `Không tìm thấy tác giả: ${thieu.join(',')}`,
         );
       tacGiaIds = tacGias.map((tg) => tg.id);
     }
@@ -187,6 +188,52 @@ export class SachService {
   }
 
   // ---- Bản sách
+  /** Bản sách kèm tên sách/tác giả; truy vấn thẳng bảng nên không ghi nhật ký tra cứu như /sach?tuKhoa. */
+  private static readonly BAN_KEM_SACH = {
+    sach: {
+      select: {
+        maSach: true,
+        tenSach: true,
+        sachTacGias: { select: { tacGia: { select: { tenTacGia: true } } } },
+      },
+    },
+  } satisfies Prisma.BanSachInclude;
+
+  private static kemSach({
+    sach: { sachTacGias, ...sach },
+    ...ban
+  }: Prisma.BanSachGetPayload<{ include: typeof SachService.BAN_KEM_SACH }>) {
+    const tacGia = sachTacGias.map((x) => x.tacGia.tenTacGia).join(', ');
+    return { ...ban, ...sach, tacGia: tacGia || null };
+  }
+
+  async timBanSach({ tuKhoa, tinhTrang, limit }: TimBanSachQueryDto) {
+    const rows = await this.prisma.banSach.findMany({
+      where: {
+        ...(tinhTrang?.length && { tinhTrang: { in: tinhTrang } }),
+        ...(tuKhoa && {
+          OR: [
+            { maBanSach: { contains: tuKhoa } },
+            { sach: { tenSach: { contains: tuKhoa } } },
+          ],
+        }),
+      },
+      include: SachService.BAN_KEM_SACH,
+      orderBy: [{ sach: { tenSach: 'asc' } }, { maBanSach: 'asc' }],
+      take: limit,
+    });
+    return rows.map((r) => SachService.kemSach(r));
+  }
+
+  async findBanSach(maBanSach: string) {
+    const ban = await this.prisma.banSach.findUnique({
+      where: { maBanSach },
+      include: SachService.BAN_KEM_SACH,
+    });
+    if (!ban) throw new NotFoundException('Không tìm thấy bản sách');
+    return SachService.kemSach(ban);
+  }
+
   listBanSach(sachId: bigint) {
     return this.prisma.banSach.findMany({
       where: { sachId },
@@ -211,7 +258,7 @@ export class SachService {
     if (
       !Object.values(TinhTrangBanSach).includes(tinhTrang as TinhTrangBanSach)
     ) {
-      throw new BadRequestException('tinhTrang khong hop le');
+      throw new BadRequestException('tinhTrang không hợp lệ');
     }
     await this.prisma
       .$executeRaw`CALL sp_cap_nhat_tinh_trang_ban_sach(${maBanSach}, ${tinhTrang})`;

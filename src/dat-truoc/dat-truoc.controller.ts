@@ -22,9 +22,9 @@ import { ApiErrors } from '../common/swagger/api-errors.decorator.js';
 import { ApiPaginatedResponse } from '../common/swagger/api-paginated.decorator.js';
 import { DatTruocService } from './dat-truoc.service.js';
 import {
-  DatTruocDto,
   HuyDatTruocQueryDto,
   ListDatTruocQueryDto,
+  TaoDatTruocDto,
 } from './dto/dat-truoc.dto.js';
 import {
   DatTruocDto as DatTruocResponseDto,
@@ -45,7 +45,7 @@ export class DatTruocController {
       'Qua `sp_dat_truoc`. Bạn đọc đặt cho chính mình (bỏ `maNguoiDung`, nếu gửi mã người khác thì 403). Cán bộ đặt hộ thì phải gửi `maNguoiDung` (thiếu: 400). 422 khi: còn bản sách sẵn sàng (không cần đặt), đang mượn chính đầu sách đó, hoặc không đủ điều kiện đặt (người dùng không hoạt động, đang giữ sách quá hạn, còn nợ phạt, đã đặt rồi...).',
   })
   @ApiCreatedResponse({ type: DatTruocResponseDto })
-  datTruoc(@Body() dto: DatTruocDto, @CurrentUser() user: AuthUser) {
+  datTruoc(@Body() dto: TaoDatTruocDto, @CurrentUser() user: AuthUser) {
     return this.service.datTruoc(dto, user);
   }
 

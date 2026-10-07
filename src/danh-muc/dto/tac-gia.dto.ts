@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/swagger';
+import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsInt,
@@ -21,11 +21,13 @@ export class CreateTacGiaDto {
   @MaxLength(160)
   tenTacGia!: string;
 
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(80)
   quocTich?: string;
 
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

@@ -32,14 +32,14 @@ export class JwtAuthGuard implements CanActivate {
       .getRequest<Request & { user?: AuthUser }>();
     const [scheme, token] = request.headers.authorization?.split(' ') ?? [];
     if (scheme !== 'Bearer' || !token) {
-      throw new UnauthorizedException('Thieu token dang nhap');
+      throw new UnauthorizedException('Thiếu token đăng nhập');
     }
 
     let user: AuthUser;
     try {
       user = await this.jwtService.verifyAsync<AuthUser>(token);
     } catch {
-      throw new UnauthorizedException('Token khong hop le hoac da het han');
+      throw new UnauthorizedException('Token không hợp lệ hoặc đã hết hạn');
     }
 
     // Token còn hạn nhưng tài khoản/người dùng có thể đã bị khóa sau khi cấp: kiểm tra DB mỗi request.

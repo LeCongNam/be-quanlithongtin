@@ -30,7 +30,7 @@ function bind(sql: string, values: Values) {
   const args: (string | number | null)[] = [];
   const text = sql.replace(THAM_SO, (_, ten: string) => {
     if (!(ten in values)) {
-      throw new BadRequestException(`Thieu tham so ${ten}`);
+      throw new BadRequestException(`Thiếu tham số ${ten}`);
     }
     args.push(values[ten]);
     return '?';
@@ -173,7 +173,7 @@ export class DemoService {
 
   private tim(id: string): MucDemo {
     const item = DEMO_CATALOG.find((m) => m.id === id);
-    if (!item) throw new NotFoundException('Khong tim thay muc demo');
+    if (!item) throw new NotFoundException('Không tìm thấy mục demo');
     return item;
   }
 
@@ -184,18 +184,18 @@ export class DemoService {
       const text = typeof raw === 'string' ? raw.trim() : '';
       if (text === '') {
         if (!p.tuyChon) {
-          throw new BadRequestException(`Thieu tham so ${p.nhan}`);
+          throw new BadRequestException(`Thiếu tham số ${p.nhan}`);
         }
         values[p.ten] = null;
       } else if (p.kieu === 'number') {
         const n = Number(text);
         if (!Number.isFinite(n)) {
-          throw new BadRequestException(`${p.nhan} phai la so`);
+          throw new BadRequestException(`${p.nhan} phải là số`);
         }
         values[p.ten] = n;
       } else if (p.kieu === 'date') {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-          throw new BadRequestException(`${p.nhan} phai co dang YYYY-MM-DD`);
+          throw new BadRequestException(`${p.nhan} phải có dạng YYYY-MM-DD`);
         }
         values[p.ten] = text;
       } else {

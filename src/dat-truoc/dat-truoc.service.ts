@@ -8,7 +8,7 @@ import { pagePriorityFirst } from '../common/priority-page.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   DAT_TRUOC_SAP_XEP,
-  DatTruocDto,
+  TaoDatTruocDto,
   ListDatTruocQueryDto,
 } from './dto/dat-truoc.dto.js';
 import { parseSapXep } from '../common/dto/sap-xep.js';
@@ -29,7 +29,7 @@ const MOI_NHAT_TRUOC = [
 export class DatTruocService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async datTruoc(dto: DatTruocDto, user: AuthUser) {
+  async datTruoc(dto: TaoDatTruocDto, user: AuthUser) {
     const maNguoiDung = resolveMaNguoiDung(user, dto.maNguoiDung);
     await this.prisma
       .$executeRaw`CALL sp_dat_truoc(${maNguoiDung}, ${dto.maSach})`;

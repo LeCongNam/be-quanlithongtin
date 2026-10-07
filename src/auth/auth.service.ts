@@ -26,7 +26,7 @@ export class AuthService {
 
     // Cùng một thông báo cho sai tên đăng nhập/mật khẩu để không lộ tài khoản có tồn tại hay không.
     if (!taiKhoan || !(await this.verifyPassword(matKhau, taiKhoan))) {
-      throw new UnauthorizedException('Ten dang nhap hoac mat khau khong dung');
+      throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không đúng');
     }
     if (
       taiKhoan.trangThai !== TrangThaiTaiKhoan.HOAT_DONG ||

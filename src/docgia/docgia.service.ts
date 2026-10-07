@@ -75,7 +75,7 @@ export class DocgiaService {
       where: { id },
       include: { taiKhoan: TAI_KHOAN_PUBLIC },
     });
-    if (!docgia) throw new NotFoundException('Khong tim thay nguoi dung');
+    if (!docgia) throw new NotFoundException('Không tìm thấy người dùng');
     return docgia;
   }
 
@@ -106,7 +106,7 @@ export class DocgiaService {
     const nd = await this.findOne(id);
     if (nd.loaiNguoiDung === LoaiNguoiDung.CAN_BO) {
       if (user.vaiTro !== VaiTroTaiKhoan.ADMIN)
-        throw new ForbiddenException('Chi quan tri doi trang thai can bo');
+        throw new ForbiddenException('Chỉ quản trị viên được đổi trạng thái cán bộ');
       await this.prisma.nguoiDung.update({
         where: { id },
         data: { trangThai },
@@ -128,7 +128,7 @@ export class DocgiaService {
     const taiKhoan = await this.prisma.taiKhoan.findUnique({
       where: { nguoiDungId: id },
     });
-    if (!taiKhoan) throw new NotFoundException('Nguoi dung chua co tai khoan');
+    if (!taiKhoan) throw new NotFoundException('Người dùng chưa có tài khoản');
     return this.prisma.taiKhoan.update({
       where: { nguoiDungId: id },
       data: { trangThai },
@@ -141,9 +141,9 @@ export class DocgiaService {
       where: { id },
       include: { taiKhoan: true },
     });
-    if (!nguoiDung) throw new NotFoundException('Khong tim thay nguoi dung');
+    if (!nguoiDung) throw new NotFoundException('Không tìm thấy người dùng');
     if (nguoiDung.taiKhoan)
-      throw new ConflictException('Nguoi dung da co tai khoan');
+      throw new ConflictException('Người dùng đã có tài khoản');
 
     const vaiTro =
       dto.vaiTro ??

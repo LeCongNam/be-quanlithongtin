@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayUnique,
   IsArray,
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -28,6 +29,7 @@ export class CreateSachDto {
   @MaxLength(20)
   maSach!: string;
 
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(20)
@@ -51,6 +53,7 @@ export class CreateSachDto {
   @MaxLength(20)
   maNxb!: string;
 
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -64,12 +67,14 @@ export class CreateSachDto {
   @MaxLength(50)
   ngonNgu?: string;
 
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   giaBia?: number;
 
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()
   moTa?: string;
@@ -82,7 +87,7 @@ export class CreateSachDto {
   @IsNotEmpty({ each: true })
   @Matches(/^[^,]+$/, {
     each: true,
-    message: 'maTacGias khong duoc chua dau phay',
+    message: 'maTacGias không được chứa dấu phẩy',
   })
   @MaxLength(20, { each: true })
   maTacGias?: string[];
@@ -106,6 +111,46 @@ export class TraCuuSachQueryDto extends PageQueryDto {
 
   @SapXepParam(SACH_SAP_XEP)
   sapXep?: string;
+}
+
+/** Tìm bản sách (lập phiếu mượn): theo mã bản hoặc tên sách, tùy chọn lọc tình trạng. */
+export class TimBanSachQueryDto {
+  /** Khớp một phần mã bản (`BS001`) hoặc tên sách; không phân biệt hoa thường, dấu. */
+  @ApiPropertyOptional({ example: 'BS00' })
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(255)
+  tuKhoa?: string;
+
+  /** Chỉ lấy các tình trạng này (lặp tham số để chọn nhiều). */
+  @ApiPropertyOptional({
+    enum: TinhTrangBanSach,
+    enumName: 'TinhTrangBanSach',
+    isArray: true,
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value === undefined ? value : [value].flat(),
+  )
+  @IsArray()
+  @ArrayUnique()
+  @IsEnum(TinhTrangBanSach, { each: true })
+  tinhTrang?: TinhTrangBanSach[];
+
+  /** Số dòng tối đa (1–50), mặc định 10. */
+  @ApiPropertyOptional({
+    type: 'integer',
+    default: 10,
+    minimum: 1,
+    maximum: 50,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit: number = 10;
 }
 
 /** Nhập bản sách qua sp_them_ban_sach: mã BSnnn tự sinh, ngày nhập = hôm nay. */

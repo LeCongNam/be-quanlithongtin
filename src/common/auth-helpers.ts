@@ -15,10 +15,10 @@ export function isStaff(user: AuthUser) {
 export function resolveMaNguoiDung(user: AuthUser, requested?: string): string {
   if (!isStaff(user)) {
     if (requested && requested !== user.maNguoiDung) {
-      throw new ForbiddenException('Chi duoc thao tac cho tai khoan cua minh');
+      throw new ForbiddenException('Chỉ được thao tác cho tài khoản của mình');
     }
     return user.maNguoiDung;
   }
-  if (!requested) throw new BadRequestException('Thieu maNguoiDung');
+  if (!requested) throw new BadRequestException('Thiếu maNguoiDung');
   return requested;
 }

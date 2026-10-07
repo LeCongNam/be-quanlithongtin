@@ -99,7 +99,7 @@ export class DanhMucService {
   }
 
   private found<T>(row: T | null, what: string): T {
-    if (!row) throw new NotFoundException(`Khong tim thay ${what}`);
+    if (!row) throw new NotFoundException(`Không tìm thấy ${what}`);
     return row;
   }
 }

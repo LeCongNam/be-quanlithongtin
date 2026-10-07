@@ -109,6 +109,19 @@ export class BanSachDto {
   tinhTrang!: TinhTrangBanSach;
 }
 
+/** Bản sách kèm thông tin đầu sách (GET /ban-sach, GET /ban-sach/:maBanSach). */
+export class BanSachKemSachDto extends BanSachDto {
+  @ApiProperty({ example: 'S001' })
+  maSach!: string;
+  @ApiProperty()
+  tenSach!: string;
+  @ApiProperty({
+    nullable: true,
+    description: 'Tên các tác giả, cách nhau bằng ", "',
+  })
+  tacGia!: string | null;
+}
+
 /** Một bản vừa nhập qua sp_them_ban_sach (POST /sach/:id/ban-sach). */
 export class BanSachMoiDto {
   @ApiProperty({ example: 'BS021' })
