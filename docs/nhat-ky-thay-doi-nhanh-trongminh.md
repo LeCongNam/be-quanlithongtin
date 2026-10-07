@@ -1,18 +1,18 @@
 # Nhật ký thay đổi — nhánh `trongminh` so với `main` (repo BE)
 
 > Lập ngày 2026-10-07 từ `git log main..HEAD` và `git diff main`.
-> Mốc so sánh: `main` = `origin/main` = `9930a95` (Fix docker compose). Đầu nhánh: `c285d35`.
+> Mốc so sánh: `main` = `origin/main` = `9930a95` (Fix docker compose). Đầu nhánh: `097e90c` (commit file log này); commit code cuối: `04bd8b9`.
 > Working tree sạch (mọi thay đổi đã commit). Nhánh **chưa push** (người dùng dặn BE chỉ commit, không push).
 
 ## 1. Tổng quan
 
 | Chỉ số | Giá trị |
 |---|---|
-| Số commit trên `main` | 28 (tác giả `minh`), 2026-10-06 11:20 → 2026-10-07 15:45 |
+| Số commit trên `main` | 29 (tác giả `minh`; 28 commit code + 1 commit file log này), 2026-10-06 11:20 → 2026-10-07 |
 | File thay đổi | 114 (89 thêm, 24 sửa, 1 xóa) |
 | Dòng | +24.043 / −1.006 (phần lớn là `docs/openapi.json` 8.715, `sql/*` ~6.000, `yarn.lock` 3.038) |
 | Stack | NestJS + Prisma + MySQL 8.0 (DB `qltv_nhom8`, bản v2.2 đóng băng) |
-| Kiểm thử | unit 21/21, e2e 46/46, lint + tsc sạch (đo trước commit `c285d35`) |
+| Kiểm thử | unit 21/21, e2e 46/46, lint + tsc sạch (đo trước commit `04bd8b9`) |
 
 `main` chỉ chứa bản SQL tham khảo ban đầu và docker compose. Toàn bộ code NestJS, auth, các module nghiệp vụ, Swagger và module demo nằm trên nhánh này.
 
@@ -50,21 +50,21 @@
 ### Đợt 3 — 2026-10-07 10:59: DB v2.2
 | Commit | Nội dung |
 |---|---|
-| `75a31b5` | Đồng bộ `database_info` d48ee8a (lỗi #49, #50) vào `sql/`, gồm `11_demo_bao_mat.sql`. Không đổi hợp đồng API; unit 15/15, e2e 27/27 trên DB v2.2 sạch. Ghi vào docs: 422 khi đặt trước đầu sách đang mượn, `thu_tu_cho` có thể null, seed mới |
-| `106c256` | "update md" (2 file, +2834 — chủ yếu `package-lock.json`) |
+| `f566f4b` | Đồng bộ `database_info` d48ee8a (lỗi #49, #50) vào `sql/`, gồm `11_demo_bao_mat.sql`. Không đổi hợp đồng API; unit 15/15, e2e 27/27 trên DB v2.2 sạch. Ghi vào docs: 422 khi đặt trước đầu sách đang mượn, `thu_tu_cho` có thể null, seed mới |
+| `ff23abd` | "update md" (2 file, +2834 — chủ yếu `package-lock.json`) |
 
 ### Đợt 4 — 2026-10-07 11:51: xác thực hai tầng (B1–B5)
 | Commit | Nội dung |
 |---|---|
-| `4eb1463` | 13 file, +496/−32 (chi tiết ở mục 3.2) |
+| `5d0aa53` | 13 file, +496/−32 (chi tiết ở mục 3.2) |
 
 ### Đợt 5 — 2026-10-07 13:29 → 15:45: Swagger, id sách, module demo
 | Commit | Nội dung |
 |---|---|
-| `238499c` | Swagger đầy đủ cho FE: response schema, mô tả endpoint, mã lỗi, CORS, xuất `openapi.json` (46 file, +9902) |
-| `eb29e95` | Cập nhật `yarn.lock` |
-| `d372dd0` | `GET /sach` trả thêm `id` để FE gọi `/sach/:id` (4 file) |
-| `c285d35` | Module `src/demo` — xử lý thông tin: procedure, trigger, function, cursor (10 file, +1764) |
+| `da300f5` | Swagger đầy đủ cho FE: response schema, mô tả endpoint, mã lỗi, CORS, xuất `openapi.json` (46 file, +9902) |
+| `5538dd7` | Cập nhật `yarn.lock` |
+| `5a6d196` | `GET /sach` trả thêm `id` để FE gọi `/sach/:id` (4 file) |
+| `04bd8b9` | Module `src/demo` — xử lý thông tin: procedure, trigger, function, cursor (10 file, +1764) |
 
 ## 3. Thay đổi theo mảng chức năng
 
@@ -75,7 +75,7 @@
 - `nest-cli.json` bật plugin Swagger của Nest; `package.json` thêm script `openapi:export`.
 - Hạ tầng chung: `bigint-json.ts`, `parse-bigint.pipe.ts`, `call-rows.ts` (gọi procedure, ép cột đếm/tiền thành number), `proc-transaction.ts`, `page-query.dto.ts`, `error-response.dto.ts`.
 
-### 3.2 Xác thực và phân quyền hai tầng (`4eb1463`)
+### 3.2 Xác thực và phân quyền hai tầng (`5d0aa53`)
 - **Tầng CSDL:** 3 user MySQL (`qltv_admin`, `qltv_thuthu`, `qltv_bandoc`) và 3 role `r_qltv_*`; tạo bằng `sql/08b_create_users.sql` (biến `@user_host`, mật khẩu `CHANGE_ME`, người dùng tự đặt, tối thiểu 12 ký tự). Bạn đọc dùng chung 1 user nên xác thực qua `sp_dang_nhap` → token (DB chỉ lưu SHA-256).
 - **Tầng BE:**
   - B1 — mật khẩu thống nhất `SHA2(muối + mật khẩu)` hex (`src/common/password.ts`). Hash bcrypt cũ vẫn đọc được và được ghi lại sang SHA2 khi đăng nhập đúng.
@@ -88,7 +88,7 @@
 ### 3.3 Module nghiệp vụ (58 endpoint)
 `auth`, `docgia`, `danh-muc` (thể loại / NXB / tác giả), `sach` (+ bản sách), `muon-tra`, `dat-truoc`, `phat`, `ban-doc` (`/me/*`), `bao-cao` (`/bao-cao/*`), `demo`. Mỗi module có controller, service, DTO request và DTO response.
 
-### 3.4 Swagger/OpenAPI (`238499c`)
+### 3.4 Swagger/OpenAPI (`da300f5`)
 - `src/openapi.ts` (`setupSwagger`): `/docs`, `/docs-json`, `/docs-yaml`; dòng "Quyền" và `x-roles` sinh từ metadata `@Roles`/`@Public` thật.
 - `*.response.dto.ts` cho mọi module, decorator `ApiErrors` và `ApiPaginatedResponse`, `@ApiOperation` cho đủ 58 endpoint.
 - `npm run openapi:export` → `docs/openapi.json`; thêm `docs/swagger-cho-fe.md`; test `openapi.e2e-spec.ts`.
@@ -98,10 +98,10 @@
   - Lỗi khóa ngoại MySQL 1217/1451/1452 trả 409 thay vì 500 (`database-exception.filter.ts`).
   - `PartialType` phải import từ `@nestjs/swagger`.
 
-### 3.5 `GET /sach` trả `id` (`d372dd0`)
+### 3.5 `GET /sach` trả `id` (`5a6d196`)
 `vw_tra_cuu_sach` không có `id` nên FE không gọi được `/sach/{id}`. `sach.service.ts` thêm `kemId()` gắn `id` theo `ma_sach` (cả nhánh `tuKhoa` lẫn view), `TraCuuSachDto` thêm `id`, xuất lại `openapi.json`, ghi vào `docs/thay-doi-api-db-v2.md`.
 
-### 3.6 Module demo xử lý thông tin (`c285d35`)
+### 3.6 Module demo xử lý thông tin (`04bd8b9`)
 - API chỉ dành cho staff: `GET /demo`, `GET /demo/:id`, `POST /demo/:id/bang {thamSo}`, `POST /demo/:id/chay {thamSo, hoanTac=true}`.
 - 16 mục: 5 procedure (`sp_tra_cuu_sach`, `sp_tra_sach`, `sp_gia_han`, `sp_dat_truoc`, `sp_thanh_toan_phat`), 5 trigger, 3 function, 3 cursor.
 - `chay` chạy trong `autocommit=0`, đọc bảng **sau** khi chạy rồi ROLLBACK (mặc định). Lỗi SIGNAL trả HTTP 200 kèm trường `loi`.
@@ -153,13 +153,13 @@ Lỗi đã sửa ở DB: **#49** — khóa tài khoản thu hồi token, ngườ
 4. Quy định đề: Note_2026 chỉ cho dùng AI ở phần website demo; báo cáo, slide và câu SQL không được dùng AI; báo cáo bị Turnitin, trùng > 25% là 0 điểm.
 
 ## 6. Lưu ý vận hành
-- **Quy tắc BE (`CLAUDE.md`):** không tự commit/push; không thêm `Co-Authored-By` hay AI attribution; tên nhánh = tên tác giả. Lưu ý: commit `75a31b5` hiện **có** dòng `Co-Authored-By: Claude Opus 5.5` — trái quy tắc này, cần người dùng quyết định có viết lại lịch sử trước khi push hay không.
+- **Quy tắc BE (`CLAUDE.md`):** không tự commit/push; không thêm `Co-Authored-By` hay AI attribution; tên nhánh = tên tác giả. Đã kiểm tra: không commit nào trên `main..HEAD` còn dòng `Co-Authored-By`. Commit `f566f4b` (Sync DB v2.2) từng có dòng này và đã được viết lại ngày 2026-10-07 (rebase, cây file giữ nguyên); vì vậy mã các commit từ đó trở đi khác với mã cũ trong các ghi chú trước đây.
 - **Đường dẫn NFD:** thư mục dự án có dấu tiếng Việt dạng NFD làm plugin Swagger của Nest sinh import sai, nên `nest start` / `node dist/main` lỗi `ERR_MODULE_NOT_FOUND`. Build và chạy ở bản copy đường dẫn ASCII, hoặc dời dự án sang thư mục không dấu (người dùng quyết định). `dist/` hiện là bản build từ copy ASCII.
 - **Kiểm thử không đụng DB làm việc:** dùng container tạm `docker run mysql:8.0` cổng 3307, mount `sql/99_full_setup.sql` + `docker/02_service_user.sql` vào `/docker-entrypoint-initdb.d`, cờ `--character-set-client-handshake=FALSE --event-scheduler=ON`, đợi log `port: 3306 MySQL Community`, rồi chạy `DATABASE_URL=… npx vitest run` và `npx vitest run --config ./vitest.config.e2e.ts`.
 - **Không chạy `npm run test:e2e` trên `mysql_container`** (cổng 3306, DB làm việc): test ghi thật (thêm người dùng, phiếu, nhật ký). Đã từng chạy nhầm và phải khôi phục từ mysqldump.
 - **Bẫy test SQL:** so sánh chuỗi trong procedure test lỗi 1267 (collation `0900_ai_ci` với `utf8mb4_unicode_ci`); `INSERT … SELECT` từ `ban_sach` vào `ct_phieu_muon` lỗi 1442 vì trigger; chạy lại `04` làm mất EXECUTE nên phải chạy lại `08` và `08b`; user `@'localhost'` bị 1045 qua cổng container (cần `@user_host='%'`).
 - **zsh:** `echo "=====X"` lỗi expansion, dùng `echo "--- X"`.
-- Repo có cả `package-lock.json` (đã đổi ở `106c256`) lẫn `yarn.lock` (`eb29e95`) — nên chọn một trình quản lý gói.
+- Repo có cả `package-lock.json` (đã đổi ở `ff23abd`) lẫn `yarn.lock` (`5538dd7`) — nên chọn một trình quản lý gói.
 
 ## 7. Danh sách file thay đổi
 Xem bằng lệnh:
