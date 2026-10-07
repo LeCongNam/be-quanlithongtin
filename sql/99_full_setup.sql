@@ -234,8 +234,12 @@ CREATE INDEX idx_tac_gia_ten ON tac_gia(ten_tac_gia);
 CREATE INDEX idx_bs_tinh_trang ON ban_sach(tinh_trang);
 CREATE INDEX idx_bs_sach_tinh_trang ON ban_sach(sach_id, tinh_trang);
 CREATE INDEX idx_ctpm_han_tra ON ct_phieu_muon(han_tra, ngay_tra);
-CREATE INDEX idx_pp_trang_thai ON phieu_phat(trang_thai);
+-- Danh sách phân trang của BE sắp theo ngày: phiếu mượn (ngay_muon DESC, id DESC), phiếu phạt chưa thu trước rồi
+-- ngay_tao DESC, đặt trước ngay_dat DESC. Chỉ mục khớp thứ tự đó để không phải filesort khi bảng lớn.
+CREATE INDEX idx_pm_ngay_muon ON phieu_muon(ngay_muon, id);
+CREATE INDEX idx_pp_trang_thai_ngay_tao ON phieu_phat(trang_thai, ngay_tao, id);
 CREATE INDEX idx_dt_trang_thai ON dat_truoc(trang_thai);
+CREATE INDEX idx_dt_ngay_dat ON dat_truoc(ngay_dat, id);
 CREATE INDEX idx_dt_hang_doi ON dat_truoc(sach_id, trang_thai, ngay_dat);
 CREATE INDEX idx_nkhv_doi_tuong ON nhat_ky_hanh_vi(loai_hanh_vi, doi_tuong, doi_tuong_id, thoi_gian);
 CREATE INDEX idx_nkhv_thoi_gian ON nhat_ky_hanh_vi(thoi_gian);
@@ -473,7 +477,7 @@ BEGIN
     WHERE ma_tham_so = p_ma;
 
     IF v_gia_tri IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Thieu tham so nghiep vu';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Thiếu tham số nghiệp vụ';
     END IF;
 
     RETURN v_gia_tri;
@@ -535,11 +539,11 @@ BEGIN
     WHERE id = p_nguoi_dung_id;
 
     IF v_trang_thai IS NULL THEN
-        RETURN 'Nguoi dung khong ton tai';
+        RETURN 'Người dùng không tồn tại';
     END IF;
 
     IF v_trang_thai <> 'HOAT_DONG' THEN
-        RETURN 'Nguoi dung khong hoat dong';
+        RETURN 'Người dùng không hoạt động';
     END IF;
 
     SELECT COUNT(*) INTO v_qua_han
@@ -551,7 +555,7 @@ BEGIN
     FOR SHARE;
 
     IF v_qua_han > 0 THEN
-        RETURN 'Dang giu sach qua han chua tra';
+        RETURN 'Đang giữ sách quá hạn chưa trả';
     END IF;
 
     SELECT COALESCE(SUM(pp.so_tien), 0) INTO v_no_phat
@@ -562,7 +566,7 @@ BEGIN
       AND pp.trang_thai = 'CHUA_THANH_TOAN';
 
     IF v_no_phat > 0 THEN
-        RETURN 'Con no tien phat chua thanh toan';
+        RETURN 'Còn nợ tiền phạt chưa thanh toán';
     END IF;
 
     RETURN NULL;
@@ -593,7 +597,7 @@ BEGIN
     FOR SHARE;
 
     IF v_dang_muon >= fn_tham_so('SO_SACH_TOI_DA') THEN
-        RETURN 'Da muon toi da so sach cho phep';
+        RETURN 'Đã mượn tối đa số sách cho phép';
     END IF;
 
     RETURN NULL;
@@ -737,7 +741,7 @@ BEGIN
     WHERE ma_nguoi_dung = p_ma_nguoi_dung;
 
     IF v_nguoi_dung_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong tim thay nguoi dung';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Không tìm thấy người dùng';
     END IF;
 
     SELECT id INTO v_nhan_vien_id
@@ -747,7 +751,7 @@ BEGIN
       AND trang_thai = 'HOAT_DONG';
 
     IF v_nhan_vien_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong tim thay can bo thu vien hop le';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Không tìm thấy cán bộ thư viện hợp lệ';
     END IF;
 
     SET v_ly_do = fn_ly_do_khong_the_muon(v_nguoi_dung_id);
@@ -799,13 +803,13 @@ BEGIN
     FOR UPDATE;
 
     IF v_phieu_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phieu muon khong ton tai hoac da dong';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phiếu mượn không tồn tại hoặc đã đóng';
     END IF;
 
     -- han_tra tính từ ngày lập phiếu; thêm sách vào phiếu cũ sẽ rút ngắn thời hạn mượn nên không cho phép.
     -- Kiểm tra ở đây chứ không ở trigger vì dữ liệu lịch sử (seed) chèn lượt mượn vào phiếu đã lập từ trước.
     IF v_ngay_muon <> CURDATE() THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phieu lap tu ngay truoc, khong them sach duoc (hay lap phieu moi)';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phiếu lập từ ngày trước, không thêm sách được (hãy lập phiếu mới)';
     END IF;
 
     SELECT id INTO v_ban_sach_id
@@ -813,7 +817,7 @@ BEGIN
     WHERE ma_ban_sach = p_ma_ban_sach;
 
     IF v_ban_sach_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong tim thay ban sach';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Không tìm thấy bản sách';
     END IF;
 
     INSERT INTO ct_phieu_muon(phieu_muon_id, ban_sach_id, han_tra)
@@ -845,7 +849,7 @@ BEGIN
     END IF;
 
     IF p_tinh_trang_tra IS NULL OR p_tinh_trang_tra NOT IN ('BINH_THUONG','HU_HONG','MAT') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tinh trang tra phai la BINH_THUONG, HU_HONG hoac MAT';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tình trạng trả phải là BINH_THUONG, HU_HONG hoặc MAT';
     END IF;
 
     SELECT c.id INTO v_ct_id
@@ -856,7 +860,7 @@ BEGIN
     FOR UPDATE OF c;
 
     IF v_ct_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ban sach khong co luot muon dang mo';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Bản sách không có lượt mượn đang mở';
     END IF;
 
     UPDATE ct_phieu_muon
@@ -909,7 +913,7 @@ BEGIN
     END IF;
 
     IF p_so_ngay IS NULL OR p_so_ngay < 1 OR p_so_ngay > fn_tham_so('SO_NGAY_GIA_HAN_TOI_DA') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'So ngay gia han khong hop le';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Số ngày gia hạn không hợp lệ';
     END IF;
 
     -- khóa lượt mượn: hai lần gia hạn đồng thời không cùng đọc so_lan_gia_han cũ
@@ -925,15 +929,15 @@ BEGIN
     FOR UPDATE OF c;
 
     IF v_ct_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ban sach khong co luot muon dang mo';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Bản sách không có lượt mượn đang mở';
     END IF;
 
     IF v_gia_han >= fn_tham_so('SO_LAN_GIA_HAN_TOI_DA') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Luot muon da gia han toi da so lan cho phep';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Lượt mượn đã gia hạn tối đa số lần cho phép';
     END IF;
 
     IF v_han_tra < CURDATE() THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sach da qua han, khong the gia han';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sách đã quá hạn, không thể gia hạn';
     END IF;
 
     SELECT trang_thai INTO v_trang_thai_nd
@@ -941,7 +945,7 @@ BEGIN
     WHERE id = v_nguoi_dung_id;
 
     IF v_trang_thai_nd <> 'HOAT_DONG' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Nguoi dung khong hoat dong';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Người dùng không hoạt động';
     END IF;
 
     -- chỉ tính người chờ còn đủ điều kiện (như sp_cap_phat_ban_sach)
@@ -953,7 +957,7 @@ BEGIN
           AND nguoi_dung_id <> v_nguoi_dung_id
           AND fn_ly_do_khong_the_dat_truoc(nguoi_dung_id) IS NULL
     ) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sach dang co nguoi dat truoc, khong the gia han';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sách đang có người đặt trước, không thể gia hạn';
     END IF;
 
     UPDATE ct_phieu_muon
@@ -996,7 +1000,7 @@ BEGIN
     WHERE ma_nguoi_dung = p_ma_nguoi_dung;
 
     IF v_nguoi_dung_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong tim thay nguoi dung';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Không tìm thấy người dùng';
     END IF;
 
     SELECT id INTO v_sach_id
@@ -1004,11 +1008,11 @@ BEGIN
     WHERE ma_sach = p_ma_sach;
 
     IF v_sach_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong tim thay sach';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Không tìm thấy sách';
     END IF;
 
     IF EXISTS (SELECT 1 FROM ban_sach WHERE sach_id = v_sach_id AND tinh_trang = 'SAN_SANG') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sach con ban san sang, khong can dat truoc';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sách còn bản sẵn sàng, không cần đặt trước';
     END IF;
 
     INSERT INTO dat_truoc(nguoi_dung_id, sach_id, han_giu, trang_thai)
@@ -1057,7 +1061,7 @@ BEGIN
     FOR UPDATE;
 
     IF v_dt_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong co luot dat truoc dang hoat dong';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Không có lượt đặt trước đang hoạt động';
     END IF;
 
     UPDATE dat_truoc SET trang_thai = 'HUY' WHERE id = v_dt_id;
@@ -1099,7 +1103,7 @@ BEGIN
     FOR UPDATE OF pp;  -- khóa dòng phạt: hai phiên thanh toán cùng lúc thì phiên sau báo lỗi thay vì ghi trùng
 
     IF v_nguoi_dung_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phieu phat khong ton tai hoac khong o trang thai chua thanh toan';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phiếu phạt không tồn tại hoặc không ở trạng thái chưa thanh toán';
     END IF;
 
     UPDATE phieu_phat
@@ -1136,7 +1140,7 @@ BEGIN
     END IF;
 
     IF p_tinh_trang IS NULL OR p_tinh_trang NOT IN ('SAN_SANG','HU_HONG','MAT','NGUNG_PHUC_VU') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tinh trang dich khong hop le';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tình trạng đích không hợp lệ';
     END IF;
 
     SELECT id, tinh_trang INTO v_id, v_hien_tai
@@ -1145,11 +1149,11 @@ BEGIN
     FOR UPDATE;
 
     IF v_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong tim thay ban sach';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Không tìm thấy bản sách';
     END IF;
 
     IF v_hien_tai IN ('DANG_MUON','DANG_GIU') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ban sach dang muon hoac dang giu, khong doi tinh trang duoc';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Bản sách đang mượn hoặc đang giữ, không đổi tình trạng được';
     END IF;
 
     IF p_tinh_trang = 'SAN_SANG' THEN
@@ -1191,7 +1195,7 @@ BEGIN
     END IF;
 
     IF p_trang_thai IS NULL OR p_trang_thai NOT IN ('HOAT_DONG','TAM_KHOA','NGUNG') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Trang thai nguoi dung phai la HOAT_DONG, TAM_KHOA hoac NGUNG';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Trạng thái người dùng phải là HOAT_DONG, TAM_KHOA hoặc NGUNG';
     END IF;
 
     SELECT id, loai_nguoi_dung, trang_thai INTO v_id, v_loai, v_hien_tai
@@ -1200,15 +1204,15 @@ BEGIN
     FOR UPDATE;
 
     IF v_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong tim thay nguoi dung';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Không tìm thấy người dùng';
     END IF;
 
     IF v_loai = 'CAN_BO' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong doi trang thai can bo qua thu tuc nay (chi quan tri)';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Không đổi trạng thái cán bộ qua thủ tục này (chỉ quản trị)';
     END IF;
 
     IF v_hien_tai = p_trang_thai THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Nguoi dung da o trang thai nay';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Người dùng đã ở trạng thái này';
     END IF;
 
     UPDATE nguoi_dung SET trang_thai = p_trang_thai WHERE id = v_id;
@@ -1258,21 +1262,21 @@ BEGIN
     END IF;
 
     IF TRIM(COALESCE(p_ma_sach, '')) = '' OR TRIM(COALESCE(p_ten_sach, '')) = '' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phai nhap ma sach va ten sach';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phải nhập mã sách và tên sách';
     END IF;
 
     IF EXISTS (SELECT 1 FROM sach WHERE ma_sach = TRIM(p_ma_sach)) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ma sach da ton tai';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Mã sách đã tồn tại';
     END IF;
 
     SELECT id INTO v_the_loai_id FROM the_loai WHERE ma_the_loai = p_ma_the_loai;
     IF v_the_loai_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong tim thay the loai';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Không tìm thấy thể loại';
     END IF;
 
     SELECT id INTO v_nxb_id FROM nha_xuat_ban WHERE ma_nxb = p_ma_nxb;
     IF v_nxb_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong tim thay nha xuat ban';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Không tìm thấy nhà xuất bản';
     END IF;
 
     -- năm, giá bìa, ngôn ngữ, ISBN trùng: do CHECK/UNIQUE của bảng sach kiểm tra
@@ -1290,7 +1294,7 @@ BEGIN
             SET v_tac_gia_id = NULL;
             SELECT id INTO v_tac_gia_id FROM tac_gia WHERE ma_tac_gia = v_ma_tac_gia;
             IF v_tac_gia_id IS NULL THEN
-                SET v_thong_bao = CONCAT('Khong tim thay tac gia: ', LEFT(v_ma_tac_gia, 50));
+                SET v_thong_bao = CONCAT('Không tìm thấy tác giả: ', LEFT(v_ma_tac_gia, 50));
                 SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_thong_bao;
             END IF;
 
@@ -1336,11 +1340,11 @@ BEGIN
     END IF;
 
     IF p_so_ban IS NULL OR p_so_ban < 1 OR p_so_ban > 100 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'So ban phai tu 1 den 100';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Số bản phải từ 1 đến 100';
     END IF;
 
     IF TRIM(COALESCE(p_vi_tri_ke, '')) = '' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phai nhap vi tri ke';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phải nhập vị trí kệ';
     END IF;
 
     SELECT id INTO v_sach_id
@@ -1349,7 +1353,7 @@ BEGIN
     FOR UPDATE;
 
     IF v_sach_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong tim thay sach';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Không tìm thấy sách';
     END IF;
 
     SELECT COALESCE(MAX(CAST(SUBSTRING(ma_ban_sach, 3) AS UNSIGNED)), 0) INTO v_so
@@ -1383,12 +1387,15 @@ END$$
 -- Ký tự % _ \ trong từ khóa được hiểu theo nghĩa đen (không phải ký tự đại diện của LIKE).
 -- FULLTEXT dùng BOOLEAN MODE với cả từ khóa là một cụm từ ("..."): ngram ở NATURAL LANGUAGE MODE hợp các bigram bằng OR
 -- nên "Tanenbaum" khớp hầu hết danh mục; cụm từ buộc các bigram phải liền nhau. Dấu " trong từ khóa bị thay bằng khoảng trắng.
+-- Thứ tự kết quả theo độ liên quan: trùng mã sách/ISBN, rồi tên sách trùng hẳn, bắt đầu bằng từ khóa, chứa từ khóa, rồi
+-- khớp tên tác giả; còn lại (chỉ khớp mô tả) xếp cuối. Cùng mức thì theo tên sách rồi mã sách.
 DROP PROCEDURE IF EXISTS sp_tra_cuu_sach$$
 CREATE PROCEDURE sp_tra_cuu_sach(IN p_tu_khoa VARCHAR(255), IN p_ma_nguoi_dung VARCHAR(20))
 BEGIN
     DECLARE v_nguoi_dung_id BIGINT;
     DECLARE v_tu_khoa VARCHAR(255) DEFAULT TRIM(COALESCE(p_tu_khoa, ''));
     DECLARE v_mau_like VARCHAR(765) DEFAULT CONCAT('%', fn_escape_like(TRIM(COALESCE(p_tu_khoa, ''))), '%');
+    DECLARE v_mau_dau VARCHAR(765) DEFAULT CONCAT(fn_escape_like(TRIM(COALESCE(p_tu_khoa, ''))), '%');
     DECLARE v_cum_tu VARCHAR(260) DEFAULT CONCAT('"', REPLACE(TRIM(COALESCE(p_tu_khoa, '')), '"', ' '), '"');
 
     IF v_tu_khoa <> '' THEN
@@ -1412,7 +1419,12 @@ BEGIN
                 FROM sach s
                 WHERE MATCH(s.ten_sach, s.mo_ta) AGAINST (v_cum_tu IN BOOLEAN MODE)
            ))
-    ORDER BY v.ten_sach;
+    ORDER BY (v.ma_sach = v_tu_khoa OR v.isbn = v_tu_khoa) DESC,
+             (v.ten_sach = v_tu_khoa) DESC,
+             (v.ten_sach LIKE v_mau_dau) DESC,
+             (v.ten_sach LIKE v_mau_like) DESC,
+             (v.ds_tac_gia LIKE v_mau_like) DESC,
+             v.ten_sach, v.ma_sach;
 END$$
 
 -- ===== Phiên đăng nhập và procedure dành cho bạn đọc =====
@@ -1454,7 +1466,7 @@ BEGIN
       AND nd.trang_thai = 'HOAT_DONG';
 
     IF v_nguoi_dung_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ten dang nhap hoac mat khau khong dung';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tên đăng nhập hoặc mật khẩu không đúng';
     END IF;
 
     SET p_token = LOWER(HEX(RANDOM_BYTES(32)));
@@ -1484,7 +1496,7 @@ BEGIN
     SET p_ma_nguoi_dung = fn_nguoi_dung_tu_token(p_token);
 
     IF p_ma_nguoi_dung IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phien dang nhap khong hop le hoac da het han';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn';
     END IF;
 END$$
 
@@ -1611,11 +1623,11 @@ BEGIN
     FOR UPDATE;
 
     IF v_phieu_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phieu muon khong ton tai hoac da dong';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phiếu mượn không tồn tại hoặc đã đóng';
     END IF;
 
     IF EXISTS (SELECT 1 FROM ct_phieu_muon WHERE phieu_muon_id = v_phieu_id) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phieu da co sach, khong huy duoc (hay tra sach)';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phiếu đã có sách, không hủy được (hãy trả sách)';
     END IF;
 
     UPDATE phieu_muon SET trang_thai = 'HUY' WHERE id = v_phieu_id;
@@ -1646,7 +1658,7 @@ BEGIN
     END IF;
 
     IF p_ly_do IS NULL OR CHAR_LENGTH(TRIM(p_ly_do)) = 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phai nhap ly do huy phieu phat';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phải nhập lý do hủy phiếu phạt';
     END IF;
 
     SELECT p.nguoi_dung_id INTO v_nguoi_dung_id
@@ -1658,7 +1670,7 @@ BEGIN
     FOR UPDATE OF pp;
 
     IF v_nguoi_dung_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phieu phat khong ton tai hoac khong o trang thai chua thanh toan';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phiếu phạt không tồn tại hoặc không ở trạng thái chưa thanh toán';
     END IF;
 
     UPDATE phieu_phat
@@ -1695,7 +1707,7 @@ BEGIN
     DECLARE v_dt_id BIGINT;
 
     IF NEW.tinh_trang IN ('DANG_MUON','DANG_GIU') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ban sach moi khong duoc nhap o trang thai dang muon hoac dang giu';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Bản sách mới không được nhập ở trạng thái đang mượn hoặc đang giữ';
     END IF;
 
     IF NEW.tinh_trang = 'SAN_SANG' THEN
@@ -1758,7 +1770,7 @@ BEGIN
     WHERE id = NEW.nhan_vien_id;
 
     IF v_loai IS NULL OR v_loai <> 'CAN_BO' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Nhan vien lap phieu phai la can bo thu vien';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Nhân viên lập phiếu phải là cán bộ thư viện';
     END IF;
 END$$
 
@@ -1787,7 +1799,7 @@ BEGIN
       AND trang_thai = 'DANG_MUON';
 
     IF v_nguoi_dung_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phieu muon khong ton tai hoac da dong';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phiếu mượn không tồn tại hoặc đã đóng';
     END IF;
 
     SELECT id INTO v_khoa
@@ -1796,7 +1808,7 @@ BEGIN
     FOR UPDATE;
 
     IF v_tinh_trang IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ban sach khong ton tai';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Bản sách không tồn tại';
     END IF;
 
     IF v_tinh_trang = 'DANG_GIU' THEN
@@ -1811,10 +1823,10 @@ BEGIN
         FOR UPDATE;
 
         IF v_dt_id IS NULL THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ban sach dang duoc giu cho nguoi khac';
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Bản sách đang được giữ cho người khác';
         END IF;
     ELSEIF v_tinh_trang <> 'SAN_SANG' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ban sach khong san sang';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Bản sách không sẵn sàng';
     END IF;
 
     SET v_ly_do = fn_ly_do_khong_the_muon(v_nguoi_dung_id);
@@ -1823,7 +1835,7 @@ BEGIN
     END IF;
 
     IF NEW.han_tra < v_ngay_muon THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Han tra khong duoc truoc ngay muon';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Hạn trả không được trước ngày mượn';
     END IF;
 END$$
 
@@ -1887,7 +1899,7 @@ BEGIN
     DECLARE v_sach_id BIGINT;
 
     IF NEW.phieu_muon_id <> OLD.phieu_muon_id OR NEW.ban_sach_id <> OLD.ban_sach_id THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong duoc doi phieu muon hoac ban sach cua chi tiet muon';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Không được đổi phiếu mượn hoặc bản sách của chi tiết mượn';
     END IF;
 
     IF OLD.ngay_tra IS NOT NULL
@@ -1895,29 +1907,29 @@ BEGIN
             OR NOT (NEW.tinh_trang_tra <=> OLD.tinh_trang_tra)
             OR NEW.han_tra <> OLD.han_tra
             OR NEW.so_lan_gia_han <> OLD.so_lan_gia_han) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Chi tiet muon da tra, khong duoc sua';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Chi tiết mượn đã trả, không được sửa';
     END IF;
 
     IF OLD.ngay_tra IS NULL AND NEW.ngay_tra IS NOT NULL AND NEW.tinh_trang_tra IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phai co tinh trang tra khi tra sach';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phải có tình trạng trả khi trả sách';
     END IF;
 
     IF NEW.han_tra <> OLD.han_tra THEN
         IF NEW.so_lan_gia_han <> OLD.so_lan_gia_han + 1 THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Doi han tra phai di kem gia han 1 lan';
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Đổi hạn trả phải đi kèm gia hạn 1 lần';
         END IF;
 
         IF DATEDIFF(NEW.han_tra, OLD.han_tra) < 1
            OR DATEDIFF(NEW.han_tra, OLD.han_tra) > fn_tham_so('SO_NGAY_GIA_HAN_TOI_DA') THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'So ngay gia han vuot quy dinh';
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Số ngày gia hạn vượt quy định';
         END IF;
 
         IF NEW.so_lan_gia_han > fn_tham_so('SO_LAN_GIA_HAN_TOI_DA') THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Luot muon da gia han toi da so lan cho phep';
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Lượt mượn đã gia hạn tối đa số lần cho phép';
         END IF;
 
         IF OLD.han_tra < CURDATE() THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sach da qua han, khong the gia han';
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sách đã quá hạn, không thể gia hạn';
         END IF;
 
         SELECT p.nguoi_dung_id, nd.trang_thai INTO v_nguoi_dung_id, v_trang_thai_nd
@@ -1926,7 +1938,7 @@ BEGIN
         WHERE p.id = NEW.phieu_muon_id;
 
         IF v_trang_thai_nd IS NULL OR v_trang_thai_nd <> 'HOAT_DONG' THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Nguoi dung khong hoat dong';
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Người dùng không hoạt động';
         END IF;
 
         SELECT sach_id INTO v_sach_id
@@ -1942,10 +1954,10 @@ BEGIN
               AND nguoi_dung_id <> v_nguoi_dung_id
               AND fn_ly_do_khong_the_dat_truoc(nguoi_dung_id) IS NULL
         ) THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sach dang co nguoi dat truoc, khong the gia han';
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sách đang có người đặt trước, không thể gia hạn';
         END IF;
     ELSEIF NEW.so_lan_gia_han <> OLD.so_lan_gia_han THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Khong duoc doi so lan gia han khi khong doi han tra';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Không được đổi số lần gia hạn khi không đổi hạn trả';
     END IF;
 END$$
 
@@ -2025,7 +2037,7 @@ BEGIN
           AND trang_thai IN ('CHO_XU_LY','SAN_SANG_NHAN');
 
         IF v_count > 0 THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Da co dat truoc dang hoat dong';
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Đã có đặt trước đang hoạt động';
         END IF;
 
         IF EXISTS (
@@ -2037,7 +2049,7 @@ BEGIN
               AND b.sach_id = NEW.sach_id
               AND c.ngay_tra IS NULL
         ) THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Dang muon dau sach nay, khong dat truoc duoc';
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Đang mượn đầu sách này, không đặt trước được';
         END IF;
     END IF;
 END$$
@@ -2050,7 +2062,7 @@ FOR EACH ROW
 BEGIN
     IF OLD.trang_thai IN ('DA_THANH_TOAN','HUY')
        AND (NEW.trang_thai <> OLD.trang_thai OR NEW.so_tien <> OLD.so_tien) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phieu phat da thanh toan hoac da huy, khong duoc sua';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phiếu phạt đã thanh toán hoặc đã hủy, không được sửa';
     END IF;
 
     IF OLD.trang_thai <> 'DA_THANH_TOAN' AND NEW.trang_thai = 'DA_THANH_TOAN' THEN
@@ -2074,11 +2086,11 @@ BEGIN
 
     IF (NEW.vai_tro = 'BAN_DOC' AND v_loai = 'CAN_BO')
        OR (NEW.vai_tro IN ('ADMIN','THU_THU') AND v_loai <> 'CAN_BO') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Vai tro tai khoan khong phu hop loai nguoi dung';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Vai trò tài khoản không phù hợp loại người dùng';
     END IF;
 
     IF NEW.trang_thai = 'HOAT_DONG' AND v_trang_thai <> 'HOAT_DONG' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Nguoi dung khong hoat dong, tai khoan phai o trang thai KHOA';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Người dùng không hoạt động, tài khoản phải ở trạng thái KHOA';
     END IF;
 END$$
 
@@ -2097,11 +2109,11 @@ BEGIN
 
     IF (NEW.vai_tro = 'BAN_DOC' AND v_loai = 'CAN_BO')
        OR (NEW.vai_tro IN ('ADMIN','THU_THU') AND v_loai <> 'CAN_BO') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Vai tro tai khoan khong phu hop loai nguoi dung';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Vai trò tài khoản không phù hợp loại người dùng';
     END IF;
 
     IF NEW.trang_thai = 'HOAT_DONG' AND v_trang_thai <> 'HOAT_DONG' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Nguoi dung khong hoat dong, tai khoan phai o trang thai KHOA';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Người dùng không hoạt động, tài khoản phải ở trạng thái KHOA';
     END IF;
 
     IF (NEW.trang_thai = 'KHOA' AND OLD.trang_thai <> 'KHOA') OR NEW.mat_khau_hash <> OLD.mat_khau_hash THEN
@@ -2125,7 +2137,7 @@ BEGIN
           AND ((vai_tro = 'BAN_DOC' AND NEW.loai_nguoi_dung = 'CAN_BO')
                OR (vai_tro IN ('ADMIN','THU_THU') AND NEW.loai_nguoi_dung <> 'CAN_BO'))
     ) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Doi loai nguoi dung lam lech vai tro tai khoan';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Đổi loại người dùng làm lệch vai trò tài khoản';
     END IF;
 
     IF NOT (NEW.trang_thai <=> OLD.trang_thai) AND NEW.trang_thai <> 'HOAT_DONG' THEN
@@ -2324,7 +2336,7 @@ BEGIN
     CLOSE cur;
 
     IF v_so_loi > 0 THEN
-        SET v_thong_bao = LEFT(CONCAT(v_so_loi, ' luot giu sach het han chua xu ly duoc: ', v_loi_cuoi), 128);
+        SET v_thong_bao = LEFT(CONCAT(v_so_loi, ' lượt giữ sách hết hạn chưa xử lý được: ', v_loi_cuoi), 128);
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_thong_bao;
     END IF;
 END$$

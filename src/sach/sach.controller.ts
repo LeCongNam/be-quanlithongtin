@@ -56,7 +56,7 @@ export class SachController {
   @ApiOperation({
     summary: 'Tra cứu / danh mục sách',
     description:
-      'Có `tuKhoa`: gọi `sp_tra_cuu_sach` (tìm FULLTEXT trên tên và mô tả, ghi nhật ký tra cứu; `% _ \\` hiểu theo nghĩa đen; không phân trang: `page=1`, `limit=total`). Không có `tuKhoa` (hoặc toàn khoảng trắng): danh mục có phân trang từ `vw_tra_cuu_sach`.',
+      'Có `tuKhoa`: gọi `sp_tra_cuu_sach` (tìm FULLTEXT trên tên và mô tả, ghi nhật ký tra cứu; `% _ \\` hiểu theo nghĩa đen; không phân trang: `page=1`, `limit=total`). Không có `sapXep` thì xếp theo độ liên quan: trùng mã/ISBN, tên sách trùng hẳn, bắt đầu bằng từ khóa, chứa từ khóa, khớp tên tác giả, rồi các sách chỉ khớp mô tả; cùng mức thì theo tên sách). Không có `tuKhoa` (hoặc toàn khoảng trắng): danh mục có phân trang từ `vw_tra_cuu_sach`.',
   })
   @ApiPaginatedResponse(TraCuuSachDto)
   traCuu(@Query() q: TraCuuSachQueryDto, @CurrentUser() user: AuthUser) {

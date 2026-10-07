@@ -159,7 +159,7 @@ Lỗi đã sửa ở DB: **#49** — khóa tài khoản thu hồi token, ngườ
 - **Không chạy `npm run test:e2e` trên `mysql_container`** (cổng 3306, DB làm việc): test ghi thật (thêm người dùng, phiếu, nhật ký). Đã từng chạy nhầm và phải khôi phục từ mysqldump.
 - **Bẫy test SQL:** so sánh chuỗi trong procedure test lỗi 1267 (collation `0900_ai_ci` với `utf8mb4_unicode_ci`); `INSERT … SELECT` từ `ban_sach` vào `ct_phieu_muon` lỗi 1442 vì trigger; chạy lại `04` làm mất EXECUTE nên phải chạy lại `08` và `08b`; user `@'localhost'` bị 1045 qua cổng container (cần `@user_host='%'`).
 - **zsh:** `echo "=====X"` lỗi expansion, dùng `echo "--- X"`.
-- Repo có cả `package-lock.json` (đã đổi ở `ff23abd`) lẫn `yarn.lock` (`5538dd7`) — nên chọn một trình quản lý gói.
+- Repo có cả `package-lock.json` (đã đổi ở `ff23abd`) lẫn `yarn.lock` (`5538dd7`) — đã chọn npm và xóa `yarn.lock` (2026-10-07).
 
 ## 7. Danh sách file thay đổi
 Xem bằng lệnh:

@@ -182,7 +182,7 @@ BEGIN
     CLOSE cur;
 
     IF v_so_loi > 0 THEN
-        SET v_thong_bao = LEFT(CONCAT(v_so_loi, ' luot giu sach het han chua xu ly duoc: ', v_loi_cuoi), 128);
+        SET v_thong_bao = LEFT(CONCAT(v_so_loi, ' lượt giữ sách hết hạn chưa xử lý được: ', v_loi_cuoi), 128);
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_thong_bao;
     END IF;
 END$$

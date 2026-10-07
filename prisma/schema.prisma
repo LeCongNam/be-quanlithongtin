@@ -140,6 +140,7 @@ model PhieuMuon {
 
   @@index([nguoiDungId], map: "fk_pm_nguoi_dung")
   @@index([nhanVienId], map: "fk_pm_nhan_vien")
+  @@index([ngayMuon, id], map: "idx_pm_ngay_muon")
   @@map("phieu_muon")
 }
 
@@ -175,7 +176,7 @@ model PhieuPhat {
   ctPhieuMuon   CtPhieuMuon @relation(fields: [ctPhieuMuonId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_pp_ctpm")
 
   @@unique([ctPhieuMuonId, loaiPhat], map: "uq_pp_ct_loai")
-  @@index([trangThai], map: "idx_pp_trang_thai")
+  @@index([trangThai, ngayTao, id], map: "idx_pp_trang_thai_ngay_tao")
   @@map("phieu_phat")
 }
 
@@ -196,6 +197,7 @@ model DatTruoc {
   sach             Sach      @relation(fields: [sachId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_dt_sach")
 
   @@index([trangThai], map: "idx_dt_trang_thai")
+  @@index([ngayDat, id], map: "idx_dt_ngay_dat")
   @@index([banSachId, sachId], map: "fk_dt_ban_sach")
   @@index([nguoiDungId], map: "fk_dt_nguoi_dung")
   @@index([sachId, trangThai, ngayDat], map: "idx_dt_hang_doi")

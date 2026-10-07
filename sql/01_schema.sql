@@ -221,8 +221,12 @@ CREATE INDEX idx_tac_gia_ten ON tac_gia(ten_tac_gia);
 CREATE INDEX idx_bs_tinh_trang ON ban_sach(tinh_trang);
 CREATE INDEX idx_bs_sach_tinh_trang ON ban_sach(sach_id, tinh_trang);
 CREATE INDEX idx_ctpm_han_tra ON ct_phieu_muon(han_tra, ngay_tra);
-CREATE INDEX idx_pp_trang_thai ON phieu_phat(trang_thai);
+-- Danh sách phân trang của BE sắp theo ngày: phiếu mượn (ngay_muon DESC, id DESC), phiếu phạt chưa thu trước rồi
+-- ngay_tao DESC, đặt trước ngay_dat DESC. Chỉ mục khớp thứ tự đó để không phải filesort khi bảng lớn.
+CREATE INDEX idx_pm_ngay_muon ON phieu_muon(ngay_muon, id);
+CREATE INDEX idx_pp_trang_thai_ngay_tao ON phieu_phat(trang_thai, ngay_tao, id);
 CREATE INDEX idx_dt_trang_thai ON dat_truoc(trang_thai);
+CREATE INDEX idx_dt_ngay_dat ON dat_truoc(ngay_dat, id);
 CREATE INDEX idx_dt_hang_doi ON dat_truoc(sach_id, trang_thai, ngay_dat);
 CREATE INDEX idx_nkhv_doi_tuong ON nhat_ky_hanh_vi(loai_hanh_vi, doi_tuong, doi_tuong_id, thoi_gian);
 CREATE INDEX idx_nkhv_thoi_gian ON nhat_ky_hanh_vi(thoi_gian);

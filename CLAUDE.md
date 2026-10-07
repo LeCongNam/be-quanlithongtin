@@ -32,7 +32,7 @@ npx vitest run src/app.controller.spec.ts        # single file
 npx vitest run -t "test name"                    # single test by name
 ```
 
-Both `package-lock.json` and `yarn.lock` exist; `package.json` scripts and README use npm.
+The project uses npm only (`package-lock.json`); do not add `yarn.lock`.
 
 ## Architecture
 
@@ -58,7 +58,7 @@ Both `package-lock.json` and `yarn.lock` exist; `package.json` scripts and READM
 - `prisma db pull` caveats: (1) CHECK-constrained columns come back as `String`, so the enums live in `src/common/db-enums.ts` (TS), not in the Prisma schema; (2) renamed models/fields are preserved on re-pull, but _new_ columns arrive snake_case — rename to camelCase + `@map` by hand (e.g. `giaBia`, `ThamSo`); (3) GENERATED columns (`banSachDangMuon`, `khoaDangHoatDong`, `banSachDangGiu`) are read-only, never write them; relation fields can also come back snake_case (e.g. `ban_sach`, `dat_truoc`) — rename them back (`banSach`, `datTruocs`, `phienDangNhaps`); (4) the pulled default for `Sach.ngonNgu` can show up as mojibake if the DB was loaded with the wrong charset — it must read `"Tiếng Việt"`.
 - Docker MySQL is started with `--character-set-client-handshake=FALSE`; without it the entrypoint loads the SQL as latin1 and Vietnamese text is double-encoded in the DB.
 - ``prisma.$queryRaw`CALL sp_...` `` returns columns as `f0, f1, ...` (names lost). Use `namedRows` + the column lists in `src/common/call-rows.ts`, and keep them in sync with `sql/04_procedures.sql`. Procedures with `OUT` params need an interactive `$transaction` (same connection) plus `SELECT @var`.
-- `sp_tra_cuu_sach` trims the keyword, treats `% _ \` literally, returns nothing for an empty keyword, and uses a FULLTEXT ngram index (Vietnamese short syllables like "cơ sở" match). `sp_them_sach_vao_phieu` only accepts slips created today.
+- `sp_tra_cuu_sach` trims the keyword, treats `% _ \` literally, returns nothing for an empty keyword, and uses a FULLTEXT ngram index (Vietnamese short syllables like "cơ sở" match). Results are ordered by relevance tier (exact `ma_sach`/ISBN, exact title, title prefix, title contains, author match, description-only), then `ten_sach`, `ma_sach`; `sapXep` overrides this in `SachService`. All `SIGNAL`/function messages in `sql/03..06` are Vietnamese with diacritics; `sql/10_regression_test.sql` compares message text, so update both together. Paged lists are backed by `idx_pm_ngay_muon`, `idx_pp_trang_thai_ngay_tao`, `idx_dt_ngay_dat`. `sp_them_sach_vao_phieu` only accepts slips created today.
 - `.oxlintrc.json` enforces `typescript/no-floating-promises` as an error; `no-explicit-any` is off.
 
 ## Git safety — hard rules

@@ -16,7 +16,7 @@ BEGIN
     WHERE ma_tham_so = p_ma;
 
     IF v_gia_tri IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Thieu tham so nghiep vu';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Thiếu tham số nghiệp vụ';
     END IF;
 
     RETURN v_gia_tri;
@@ -78,11 +78,11 @@ BEGIN
     WHERE id = p_nguoi_dung_id;
 
     IF v_trang_thai IS NULL THEN
-        RETURN 'Nguoi dung khong ton tai';
+        RETURN 'Người dùng không tồn tại';
     END IF;
 
     IF v_trang_thai <> 'HOAT_DONG' THEN
-        RETURN 'Nguoi dung khong hoat dong';
+        RETURN 'Người dùng không hoạt động';
     END IF;
 
     SELECT COUNT(*) INTO v_qua_han
@@ -94,7 +94,7 @@ BEGIN
     FOR SHARE;
 
     IF v_qua_han > 0 THEN
-        RETURN 'Dang giu sach qua han chua tra';
+        RETURN 'Đang giữ sách quá hạn chưa trả';
     END IF;
 
     SELECT COALESCE(SUM(pp.so_tien), 0) INTO v_no_phat
@@ -105,7 +105,7 @@ BEGIN
       AND pp.trang_thai = 'CHUA_THANH_TOAN';
 
     IF v_no_phat > 0 THEN
-        RETURN 'Con no tien phat chua thanh toan';
+        RETURN 'Còn nợ tiền phạt chưa thanh toán';
     END IF;
 
     RETURN NULL;
@@ -136,7 +136,7 @@ BEGIN
     FOR SHARE;
 
     IF v_dang_muon >= fn_tham_so('SO_SACH_TOI_DA') THEN
-        RETURN 'Da muon toi da so sach cho phep';
+        RETURN 'Đã mượn tối đa số sách cho phép';
     END IF;
 
     RETURN NULL;

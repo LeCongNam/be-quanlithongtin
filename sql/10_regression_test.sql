@@ -282,7 +282,7 @@ BEGIN
     ROLLBACK;
     SET autocommit = 1;
     CALL t_kiem_tra('L4a', v_loi <> 0, 'Them sach vao phieu lap tu ngay truoc bi tu choi');
-    CALL t_kiem_tra('L4a', v_thong_bao LIKE '%phieu moi%', 'Thong bao huong dan lap phieu moi');
+    CALL t_kiem_tra('L4a', v_thong_bao LIKE '%phiếu mới%', 'Thong bao huong dan lap phieu moi');
     CALL t_kiem_tra('L4a', v_so_ct_sau = v_so_ct_truoc, 'Khong ghi luot muon nao');
     CALL t_kiem_tra('L4a', v_tt_ban_sach = 'SAN_SANG', 'BS002 van SAN_SANG');
 
@@ -525,7 +525,7 @@ BEGIN
 
     CALL t_chay("CALL sp_dang_nhap('t7a', 'sai_mat_khau', @t7_x)", v_loi, v_msg);
     CALL t_chay("CALL sp_dang_nhap('khong_ton_tai', 'Mk_Test_7', @t7_x)", v_loi2, v_msg2);
-    CALL t_kiem_tra('L7a', v_loi = 1644 AND v_msg LIKE 'Ten dang nhap%', 'Sai mat khau bi tu choi');
+    CALL t_kiem_tra('L7a', v_loi = 1644 AND v_msg LIKE 'Tên đăng nhập%', 'Sai mat khau bi tu choi');
     CALL t_kiem_tra('L7a', v_loi2 = 1644 AND v_msg2 = v_msg, 'Sai ten dang nhap bao cung thong bao (khong lo tai khoan co ton tai)');
     -- sv007 đang tạm khóa (tài khoản KHOA): đúng mật khẩu vẫn không vào được
     CALL t_chay("CALL sp_dang_nhap('sv007', 'SV007@Nhom8', @t7_x)", v_loi, v_msg);
@@ -548,11 +548,11 @@ BEGIN
 
     -- L7c. IDOR: không còn truyền mã người dùng tùy ý; mỗi bạn đọc chỉ thao tác trên dữ liệu của chính mình
     CALL t_chay("CALL sp_bandoc_tien_phat('SV005')", v_loi, v_msg);
-    CALL t_kiem_tra('L7c', v_loi = 1644 AND v_msg LIKE 'Phien dang nhap%', 'sp_bandoc_tien_phat tu choi ma nguoi dung tho (xem phat nguoi khac)');
+    CALL t_kiem_tra('L7c', v_loi = 1644 AND v_msg LIKE 'Phiên đăng nhập%', 'sp_bandoc_tien_phat tu choi ma nguoi dung tho (xem phat nguoi khac)');
     CALL t_chay("CALL sp_bandoc_sach_dang_muon('SV004')", v_loi, v_msg);
-    CALL t_kiem_tra('L7c', v_loi = 1644 AND v_msg LIKE 'Phien dang nhap%', 'sp_bandoc_sach_dang_muon tu choi ma nguoi dung tho');
+    CALL t_kiem_tra('L7c', v_loi = 1644 AND v_msg LIKE 'Phiên đăng nhập%', 'sp_bandoc_sach_dang_muon tu choi ma nguoi dung tho');
     CALL t_chay("CALL sp_bandoc_tra_cuu('SV005', 'abc')", v_loi, v_msg);
-    CALL t_kiem_tra('L7c', v_loi = 1644 AND v_msg LIKE 'Phien dang nhap%', 'sp_bandoc_tra_cuu tu choi ma nguoi dung tho (ghi nhat ky gia)');
+    CALL t_kiem_tra('L7c', v_loi = 1644 AND v_msg LIKE 'Phiên đăng nhập%', 'sp_bandoc_tra_cuu tu choi ma nguoi dung tho (ghi nhat ky gia)');
     CALL t_chay('CALL sp_bandoc_tien_phat(@t7_a)', v_loi, v_msg);
     CALL t_kiem_tra('L7c', v_loi = 0, 'sp_bandoc_tien_phat voi token hop le chay duoc');
     CALL t_chay('CALL sp_bandoc_sach_dang_muon(@t7_a)', v_loi, v_msg);
@@ -567,7 +567,7 @@ BEGIN
                             WHERE s.ma_sach = 'S_T7') = 1, 'Khong phat sinh luot dat cho nguoi khac');
 
     CALL t_chay("CALL sp_bandoc_huy_dat_truoc(@t7_b, 'S_T7')", v_loi, v_msg);
-    CALL t_kiem_tra('L7c', v_loi = 1644 AND v_msg LIKE 'Khong co luot dat truoc%', 'T7B khong huy duoc luot dat cua T7A');
+    CALL t_kiem_tra('L7c', v_loi = 1644 AND v_msg LIKE 'Không có lượt đặt trước%', 'T7B khong huy duoc luot dat cua T7A');
     CALL t_kiem_tra('L7c', (SELECT d.trang_thai FROM dat_truoc d JOIN sach s ON s.id = d.sach_id
                             WHERE s.ma_sach = 'S_T7') = 'CHO_XU_LY', 'Luot dat cua T7A van CHO_XU_LY');
     CALL t_chay("CALL sp_bandoc_huy_dat_truoc(@t7_a, 'S_T7')", v_loi, v_msg);
@@ -586,7 +586,7 @@ BEGIN
     CALL t_gia_tri("COALESCE(fn_nguoi_dung_tu_token(@t7_a), 'KHONG')");
     CALL t_kiem_tra('L7d', @t_kq = 'KHONG', 'Token da dang xuat khong dung duoc nua');
     CALL t_chay("CALL sp_bandoc_dat_truoc(@t7_a, 'S_T7')", v_loi, v_msg);
-    CALL t_kiem_tra('L7d', v_loi = 1644 AND v_msg LIKE 'Phien dang nhap%', 'Procedure bao loi phien voi token da dang xuat');
+    CALL t_kiem_tra('L7d', v_loi = 1644 AND v_msg LIKE 'Phiên đăng nhập%', 'Procedure bao loi phien voi token da dang xuat');
     CALL t_gia_tri('fn_nguoi_dung_tu_token(@t7_a2)');
     CALL t_kiem_tra('L7d', @t_kq = 'T7A', 'Dang xuat mot phien khong anh huong phien khac cua T7A');
     CALL t_chay("CALL sp_dang_xuat('khong_ton_tai')", v_loi, v_msg);
@@ -764,19 +764,19 @@ BEGIN
         'sp_them_ban_sach: ban moi ma BS<lon nhat + 1>, SAN_SANG, dung vi tri ke, ngay nhap hom nay');
 
     CALL t_chay("CALL sp_them_sach('S_T9', NULL, 'Trung ma', 'TL01', 'NXB01', NULL, NULL, NULL, NULL, NULL)", v_loi, v_msg);
-    CALL t_kiem_tra('L9d', v_loi = 1644 AND v_msg LIKE 'Ma sach da ton tai%', 'Trung ma sach bi tu choi');
+    CALL t_kiem_tra('L9d', v_loi = 1644 AND v_msg LIKE 'Mã sách đã tồn tại%', 'Trung ma sach bi tu choi');
     CALL t_chay("CALL sp_them_sach('S_T9X', NULL, 'Sach X', 'TL01', 'NXB01', NULL, NULL, NULL, NULL, 'TG01,TG99')", v_loi, v_msg);
-    CALL t_kiem_tra('L9d', v_loi = 1644 AND v_msg LIKE 'Khong tim thay tac gia%TG99%'
+    CALL t_kiem_tra('L9d', v_loi = 1644 AND v_msg LIKE 'Không tìm thấy tác giả%TG99%'
                        AND NOT EXISTS (SELECT 1 FROM sach WHERE ma_sach = 'S_T9X'),
         'Tac gia khong ton tai: bao loi va khong de lai dau sach (nguyen tu)');
     CALL t_chay("CALL sp_them_sach('S_T9X', NULL, 'Sach X', 'TL99', 'NXB01', NULL, NULL, NULL, NULL, NULL)", v_loi, v_msg);
-    CALL t_kiem_tra('L9d', v_loi = 1644 AND v_msg LIKE 'Khong tim thay the loai%', 'The loai khong ton tai bi tu choi');
+    CALL t_kiem_tra('L9d', v_loi = 1644 AND v_msg LIKE 'Không tìm thấy thể loại%', 'The loai khong ton tai bi tu choi');
     CALL t_chay("CALL sp_them_sach('S_T9X', NULL, '   ', 'TL01', 'NXB01', NULL, NULL, NULL, NULL, NULL)", v_loi, v_msg);
     CALL t_kiem_tra('L9d', v_loi = 1644 AND NOT EXISTS (SELECT 1 FROM sach WHERE ma_sach = 'S_T9X'), 'Ten sach rong bi tu choi');
     CALL t_chay("CALL sp_them_ban_sach('S_T9', 0, 'Z9-01')", v_loi, v_msg);
     CALL t_kiem_tra('L9d', v_loi = 1644, 'So ban phai lon hon 0');
     CALL t_chay("CALL sp_them_ban_sach('KHONG_CO', 1, 'Z9-01')", v_loi, v_msg);
-    CALL t_kiem_tra('L9d', v_loi = 1644 AND v_msg LIKE 'Khong tim thay sach%', 'Dau sach khong ton tai bi tu choi');
+    CALL t_kiem_tra('L9d', v_loi = 1644 AND v_msg LIKE 'Không tìm thấy sách%', 'Dau sach khong ton tai bi tu choi');
 
     -- Bản cũ không có sp_them_sach: tự tạo dữ liệu để các kiểm tra L9b/L9c sau vẫn chạy được (và FAIL đúng chỗ)
     IF NOT EXISTS (SELECT 1 FROM sach WHERE ma_sach = 'S_T9') THEN
@@ -795,9 +795,9 @@ BEGIN
 
     -- L9c. Bạn đọc tự gia hạn bằng token, chỉ trên lượt mượn của chính mình
     CALL t_chay("CALL sp_bandoc_gia_han('T9B', @t9_bs, 3)", v_loi, v_msg);
-    CALL t_kiem_tra('L9c', v_loi = 1644 AND v_msg LIKE 'Phien dang nhap%', 'sp_bandoc_gia_han tu choi ma nguoi dung tho');
+    CALL t_kiem_tra('L9c', v_loi = 1644 AND v_msg LIKE 'Phiên đăng nhập%', 'sp_bandoc_gia_han tu choi ma nguoi dung tho');
     CALL t_chay('CALL sp_bandoc_gia_han(@t9_a, @t9_bs, 3)', v_loi, v_msg);
-    CALL t_kiem_tra('L9c', v_loi = 1644 AND v_msg LIKE 'Ban sach khong co luot muon dang mo%',
+    CALL t_kiem_tra('L9c', v_loi = 1644 AND v_msg LIKE 'Bản sách không có lượt mượn đang mở%',
         'T9A khong gia han duoc sach T9B dang muon (bao nhu khong co luot muon, khong lo ai dang muon)');
     CALL t_kiem_tra('L9c', (SELECT c.so_lan_gia_han FROM ct_phieu_muon c JOIN ban_sach b ON b.id = c.ban_sach_id
                             WHERE b.ma_ban_sach = @t9_bs AND c.ngay_tra IS NULL) = 0,
@@ -811,9 +811,9 @@ BEGIN
                                    WHERE nd.ma_nguoi_dung = 'T9B' AND k.loai_hanh_vi = 'GIA_HAN'),
         'Nhat ky GIA_HAN ghi cho T9B');
     CALL t_chay('CALL sp_bandoc_gia_han(@t9_b, @t9_bs, 3)', v_loi, v_msg);
-    CALL t_kiem_tra('L9c', v_loi = 1644 AND v_msg LIKE 'Luot muon da gia han toi da%', 'Ban doc van bi gioi han so lan gia han');
+    CALL t_kiem_tra('L9c', v_loi = 1644 AND v_msg LIKE 'Lượt mượn đã gia hạn tối đa%', 'Ban doc van bi gioi han so lan gia han');
     CALL t_chay('CALL sp_gia_han(@t9_bs, 3)', v_loi, v_msg);
-    CALL t_kiem_tra('L9c', v_loi = 1644 AND v_msg LIKE 'Luot muon da gia han toi da%'
+    CALL t_kiem_tra('L9c', v_loi = 1644 AND v_msg LIKE 'Lượt mượn đã gia hạn tối đa%'
                        AND (SELECT COUNT(*) FROM information_schema.parameters
                             WHERE specific_schema = 'qltv_nhom8' AND specific_name = 'sp_gia_han') = 2,
         'sp_gia_han cua thu thu giu nguyen 2 tham so va cung quy tac');
@@ -846,11 +846,11 @@ BEGIN
     CALL t_kiem_tra('L9b', @t_kq = '1', 'vw_lich_su_muon gom moi luot muon (ca dang muon va da tra)');
 
     CALL t_chay("CALL sp_bandoc_lich_su_muon('T9B')", v_loi, v_msg);
-    CALL t_kiem_tra('L9b', v_loi = 1644 AND v_msg LIKE 'Phien dang nhap%', 'sp_bandoc_lich_su_muon tu choi ma nguoi dung tho');
+    CALL t_kiem_tra('L9b', v_loi = 1644 AND v_msg LIKE 'Phiên đăng nhập%', 'sp_bandoc_lich_su_muon tu choi ma nguoi dung tho');
     CALL t_chay('CALL sp_bandoc_lich_su_muon(@t9_b)', v_loi, v_msg);
     CALL t_kiem_tra('L9b', v_loi = 0, 'sp_bandoc_lich_su_muon voi token hop le chay duoc');
     CALL t_chay("CALL sp_bandoc_ds_dat_truoc('T9A')", v_loi, v_msg);
-    CALL t_kiem_tra('L9b', v_loi = 1644 AND v_msg LIKE 'Phien dang nhap%', 'sp_bandoc_ds_dat_truoc tu choi ma nguoi dung tho');
+    CALL t_kiem_tra('L9b', v_loi = 1644 AND v_msg LIKE 'Phiên đăng nhập%', 'sp_bandoc_ds_dat_truoc tu choi ma nguoi dung tho');
     CALL t_chay('CALL sp_bandoc_ds_dat_truoc(@t9_a)', v_loi, v_msg);
     CALL t_kiem_tra('L9b', v_loi = 0, 'sp_bandoc_ds_dat_truoc voi token hop le chay duoc');
 
@@ -956,7 +956,7 @@ BEGIN
     INSERT INTO ct_phieu_muon(phieu_muon_id, ban_sach_id, han_tra)
     VALUES(@t10_pm_id, @t10_w_id, CURDATE() - INTERVAL 6 DAY);
     CALL t_kiem_tra('L10b', (SELECT fn_ly_do_khong_the_dat_truoc(id) FROM nguoi_dung WHERE ma_nguoi_dung = 'T10A')
-                            = 'Dang giu sach qua han chua tra' COLLATE utf8mb4_unicode_ci, 'Chuan bi: T10A dang qua han, khong du dieu kien');
+                            = 'Đang giữ sách quá hạn chưa trả' COLLATE utf8mb4_unicode_ci, 'Chuan bi: T10A dang qua han, khong du dieu kien');
     CALL t_kiem_tra('L10b', (SELECT thu_tu_cho FROM vw_dat_truoc WHERE ma_nguoi_dung = 'T10A' AND ma_sach = 'S_T10') IS NULL,
         'vw_dat_truoc: nguoi khong du dieu kien khong co thu tu cho');
     CALL sp_tra_sach('BST10X', 'BINH_THUONG');
