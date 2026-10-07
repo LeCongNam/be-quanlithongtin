@@ -12,6 +12,7 @@ import { DatTruocModule } from './dat-truoc/dat-truoc.module.js';
 import { PhatModule } from './phat/phat.module.js';
 import { BanDocModule } from './ban-doc/ban-doc.module.js';
 import { BaoCaoModule } from './bao-cao/bao-cao.module.js';
+import { DemoModule } from './demo/demo.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { APP_FILTER } from '@nestjs/core';
 import { DatabaseExceptionFilter } from './common/filters/database-exception.filter.js';
@@ -31,6 +32,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     PhatModule,
     BanDocModule,
     BaoCaoModule,
+    DemoModule,
   ],
   controllers: [AppController],
   providers: [

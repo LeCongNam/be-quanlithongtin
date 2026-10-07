@@ -47,7 +47,7 @@ export class DatabaseExceptionFilter implements ExceptionFilter {
     });
   }
 
-  private map(
+  map(
     exception:
       | Prisma.PrismaClientKnownRequestError
       | Prisma.PrismaClientUnknownRequestError,

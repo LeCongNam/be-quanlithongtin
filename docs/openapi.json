@@ -5416,6 +5416,344 @@
           "THU_THU"
         ]
       }
+    },
+    "/demo": {
+      "get": {
+        "description": "Mỗi mục có bài toán (bước 1); chi tiết, câu SQL, bảng liên quan và nút chạy ở các endpoint bên dưới.\n\n**Quyền:** `ADMIN`, `THU_THU`",
+        "operationId": "Demo_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DemoMucDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dữ liệu gửi lên không hợp lệ (message là mảng lỗi validate) hoặc vi phạm CHECK của CSDL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu/sai/hết hạn JWT, hoặc tài khoản/người dùng đang bị khóa hay ngừng hoạt động",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Vai trò của tài khoản không được phép gọi endpoint này",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy bản ghi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Danh sách mục demo (Procedure, Trigger, Function, Cursor)",
+        "tags": [
+          "demo"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "THU_THU"
+        ]
+      }
+    },
+    "/demo/{id}": {
+      "get": {
+        "description": "Câu SQL của procedure/function đọc từ CSDL bằng `SHOW CREATE`; trigger đọc từ `sql/05_triggers.sql` vì user `qltt` không có quyền TRIGGER. Gợi ý tham số lấy từ dữ liệu hiện có.\n\n**Quyền:** `ADMIN`, `THU_THU`",
+        "operationId": "Demo_chiTiet",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoChiTietDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dữ liệu gửi lên không hợp lệ (message là mảng lỗi validate) hoặc vi phạm CHECK của CSDL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu/sai/hết hạn JWT, hoặc tài khoản/người dùng đang bị khóa hay ngừng hoạt động",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Vai trò của tài khoản không được phép gọi endpoint này",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy bản ghi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Chi tiết một mục demo: câu SQL (bước 2), tham số, câu lệnh thực thi (bước 4)",
+        "tags": [
+          "demo"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "THU_THU"
+        ]
+      }
+    },
+    "/demo/{id}/bang": {
+      "post": {
+        "description": "Chỉ đọc; dữ liệu truy vấn trực tiếp từ CSDL theo tham số.\n\n**Quyền:** `ADMIN`, `THU_THU`",
+        "operationId": "Demo_bang",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoThamSoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoBangLienQuanDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dữ liệu gửi lên không hợp lệ (message là mảng lỗi validate) hoặc vi phạm CHECK của CSDL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu/sai/hết hạn JWT, hoặc tài khoản/người dùng đang bị khóa hay ngừng hoạt động",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Vai trò của tài khoản không được phép gọi endpoint này",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy bản ghi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Các bảng liên quan trước khi chạy (bước 3)",
+        "tags": [
+          "demo"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "THU_THU"
+        ]
+      }
+    },
+    "/demo/{id}/chay": {
+      "post": {
+        "description": "Chạy trong transaction; `hoanTac = true` (mặc định) thì ROLLBACK sau khi đọc lại bảng nên dữ liệu không đổi. Lỗi nghiệp vụ của procedure/trigger không trả 422 mà nằm trong `loi` (kèm bảng sau khi chạy) để trình bày; tham số sai trả 400.\n\n**Quyền:** `ADMIN`, `THU_THU`",
+        "operationId": "Demo_chay",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoChayDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoKetQuaDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dữ liệu gửi lên không hợp lệ (message là mảng lỗi validate) hoặc vi phạm CHECK của CSDL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu/sai/hết hạn JWT, hoặc tài khoản/người dùng đang bị khóa hay ngừng hoạt động",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Vai trò của tài khoản không được phép gọi endpoint này",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không tìm thấy bản ghi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Thực thi và xem lại các bảng liên quan (bước 4 và 5)",
+        "tags": [
+          "demo"
+        ],
+        "x-roles": [
+          "ADMIN",
+          "THU_THU"
+        ]
+      }
     }
   },
   "info": {
@@ -8020,6 +8358,356 @@
           "ma_ban_sach",
           "han_giu",
           "thu_tu_cho"
+        ]
+      },
+      "DemoMucDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "sp-tra-sach"
+          },
+          "loai": {
+            "type": "string",
+            "enum": [
+              "PROCEDURE",
+              "TRIGGER",
+              "FUNCTION",
+              "CURSOR"
+            ]
+          },
+          "tieuDe": {
+            "type": "string"
+          },
+          "baiToan": {
+            "type": "string",
+            "description": "Bước 1: bài toán"
+          },
+          "doiTuong": {
+            "description": "Tên routine/trigger liên quan",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "loai",
+          "tieuDe",
+          "baiToan",
+          "doiTuong"
+        ]
+      },
+      "DemoDinhNghiaDto": {
+        "type": "object",
+        "properties": {
+          "ten": {
+            "type": "string",
+            "example": "sp_tra_sach"
+          },
+          "sql": {
+            "type": "string",
+            "nullable": true,
+            "description": "Bước 2: câu lệnh CREATE đọc từ CSDL (trigger: từ sql/05_triggers.sql)"
+          },
+          "nguon": {
+            "type": "string",
+            "enum": [
+              "CSDL",
+              "TEP_SQL"
+            ]
+          }
+        },
+        "required": [
+          "ten",
+          "sql",
+          "nguon"
+        ]
+      },
+      "DemoGoiYDto": {
+        "type": "object",
+        "properties": {
+          "giaTri": {
+            "type": "string"
+          },
+          "moTa": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "giaTri",
+          "moTa"
+        ]
+      },
+      "DemoThamSoMoTaDto": {
+        "type": "object",
+        "properties": {
+          "ten": {
+            "type": "string",
+            "example": "ma_ban_sach"
+          },
+          "nhan": {
+            "type": "string"
+          },
+          "kieu": {
+            "type": "string",
+            "enum": [
+              "text",
+              "number",
+              "date"
+            ]
+          },
+          "macDinh": {
+            "type": "string",
+            "nullable": true
+          },
+          "tuyChon": {
+            "type": "boolean",
+            "description": "true: được để trống (truyền NULL)"
+          },
+          "goiY": {
+            "description": "Giá trị gợi ý lấy từ dữ liệu hiện có",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DemoGoiYDto"
+            }
+          }
+        },
+        "required": [
+          "ten",
+          "nhan",
+          "kieu",
+          "macDinh",
+          "tuyChon",
+          "goiY"
+        ]
+      },
+      "DemoTinhHuongDto": {
+        "type": "object",
+        "properties": {
+          "nhan": {
+            "type": "string"
+          },
+          "thamSo": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "nhan",
+          "thamSo"
+        ]
+      },
+      "DemoChiTietDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "sp-tra-sach"
+          },
+          "loai": {
+            "type": "string",
+            "enum": [
+              "PROCEDURE",
+              "TRIGGER",
+              "FUNCTION",
+              "CURSOR"
+            ]
+          },
+          "tieuDe": {
+            "type": "string"
+          },
+          "baiToan": {
+            "type": "string",
+            "description": "Bước 1: bài toán"
+          },
+          "doiTuong": {
+            "description": "Tên routine/trigger liên quan",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dinhNghia": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DemoDinhNghiaDto"
+            }
+          },
+          "thamSo": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DemoThamSoMoTaDto"
+            }
+          },
+          "tinhHuong": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DemoTinhHuongDto"
+            }
+          },
+          "lenh": {
+            "type": "string",
+            "description": "Bước 4: câu lệnh sẽ thực thi, tham số dạng `:ten`"
+          },
+          "bang": {
+            "description": "Nhãn các bảng liên quan (bước 3 và 5)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "loai",
+          "tieuDe",
+          "baiToan",
+          "doiTuong",
+          "dinhNghia",
+          "thamSo",
+          "tinhHuong",
+          "lenh",
+          "bang"
+        ]
+      },
+      "DemoThamSoDto": {
+        "type": "object",
+        "properties": {
+          "thamSo": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Giá trị các tham số theo tên (`ten` ở `GET /demo/:id`); tham số tùy chọn để trống thì bỏ qua hoặc gửi chuỗi rỗng.",
+            "example": {
+              "ma_ban_sach": "BS006",
+              "tinh_trang_tra": "BINH_THUONG"
+            }
+          }
+        },
+        "required": [
+          "thamSo"
+        ]
+      },
+      "DemoBangDto": {
+        "type": "object",
+        "properties": {
+          "nhan": {
+            "type": "string"
+          },
+          "cot": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dong": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "nhan",
+          "cot",
+          "dong"
+        ]
+      },
+      "DemoBangLienQuanDto": {
+        "type": "object",
+        "properties": {
+          "bang": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DemoBangDto"
+            }
+          }
+        },
+        "required": [
+          "bang"
+        ]
+      },
+      "DemoChayDto": {
+        "type": "object",
+        "properties": {
+          "thamSo": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Giá trị các tham số theo tên (`ten` ở `GET /demo/:id`); tham số tùy chọn để trống thì bỏ qua hoặc gửi chuỗi rỗng.",
+            "example": {
+              "ma_ban_sach": "BS006",
+              "tinh_trang_tra": "BINH_THUONG"
+            }
+          },
+          "hoanTac": {
+            "type": "boolean",
+            "description": "true (mặc định): chạy trong transaction rồi ROLLBACK, dữ liệu không đổi nhưng vẫn thấy kết quả \"sau khi chạy\".",
+            "default": true
+          }
+        },
+        "required": [
+          "thamSo"
+        ]
+      },
+      "DemoKetQuaDto": {
+        "type": "object",
+        "properties": {
+          "lenh": {
+            "type": "string",
+            "description": "Câu lệnh đã thực thi, tham số đã thay giá trị"
+          },
+          "thanhCong": {
+            "type": "boolean"
+          },
+          "loi": {
+            "type": "string",
+            "nullable": true,
+            "description": "Thông báo lỗi của CSDL (SIGNAL của procedure/trigger)"
+          },
+          "daHoanTac": {
+            "type": "boolean",
+            "description": "true: đã ROLLBACK, dữ liệu không đổi"
+          },
+          "soDongAnhHuong": {
+            "type": "number",
+            "nullable": true,
+            "description": "Số dòng bị ảnh hưởng (câu DML)"
+          },
+          "ketQua": {
+            "nullable": true,
+            "description": "Output của function/procedure có result set",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DemoBangDto"
+              }
+            ]
+          },
+          "bangSau": {
+            "description": "Bước 5: các bảng liên quan sau khi chạy (trước khi hoàn tác)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DemoBangDto"
+            }
+          }
+        },
+        "required": [
+          "lenh",
+          "thanhCong",
+          "loi",
+          "daHoanTac",
+          "soDongAnhHuong",
+          "ketQua",
+          "bangSau"
         ]
       }
     }
