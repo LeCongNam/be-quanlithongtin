@@ -136,7 +136,7 @@ JOIN ban_sach bs ON bs.id = c.ban_sach_id
 JOIN sach s ON s.id = bs.sach_id;
 
 -- Đặt trước: bản sách đang giữ (khi SAN_SANG_NHAN) và thứ tự trong hàng chờ (khi CHO_XU_LY). Thứ tự tính như
--- sp_cap_phat_ban_sach chọn người: chỉ người đang HOAT_DONG, theo ngay_dat rồi id; người không hoạt động thì NULL.
+-- sp_cap_phat_ban_sach chọn người: chỉ người còn đủ điều kiện đặt trước, theo ngay_dat rồi id; người không đủ thì NULL.
 CREATE OR REPLACE VIEW vw_dat_truoc AS
 SELECT
     nd.ma_nguoi_dung,
@@ -147,13 +147,12 @@ SELECT
     d.trang_thai,
     bs.ma_ban_sach,
     d.han_giu,
-    CASE WHEN d.trang_thai = 'CHO_XU_LY' AND nd.trang_thai = 'HOAT_DONG' THEN (
+    CASE WHEN d.trang_thai = 'CHO_XU_LY' AND fn_ly_do_khong_the_dat_truoc(d.nguoi_dung_id) IS NULL THEN (
         SELECT COUNT(*)
         FROM dat_truoc d2
-        JOIN nguoi_dung n2 ON n2.id = d2.nguoi_dung_id
         WHERE d2.sach_id = d.sach_id
           AND d2.trang_thai = 'CHO_XU_LY'
-          AND n2.trang_thai = 'HOAT_DONG'
+          AND fn_ly_do_khong_the_dat_truoc(d2.nguoi_dung_id) IS NULL
           AND (d2.ngay_dat < d.ngay_dat OR (d2.ngay_dat = d.ngay_dat AND d2.id <= d.id))
     ) END AS thu_tu_cho
 FROM dat_truoc d

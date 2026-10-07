@@ -28,3 +28,12 @@ Ngày: 2026-10-06. Ghi chú cho FE. Chi tiết request/response xem Swagger `/do
 - `DELETE /docgia/:id` vẫn chuyển người dùng sang `NGUNG`. Riêng người dùng là cán bộ thì chỉ ADMIN được làm.
 - `GET /me/sach-dang-muon` và `GET /me/tien-phat` giữ nguyên cột.
 - Lỗi nghiệp vụ do trigger chặn khi ghi dữ liệu trước đây có chỗ trả 500, nay trả 422 kèm thông báo của DB.
+
+## Đồng bộ DB v2.1 và v2.2 (mục #49, #50, ngày 2026-10-07)
+
+Không đổi hợp đồng API (chữ ký procedure, view, quyền giữ nguyên). Thay đổi hành vi FE cần biết:
+
+- `POST /dat-truoc`: đặt trước đầu sách mà chính người đó đang mượn trả **422** `Dang muon dau sach nay, khong dat truoc duoc`.
+- Gia hạn (`POST /muon-tra/gia-han`): người chờ đang bị khóa, quá hạn hoặc nợ phạt không còn chặn người đang mượn gia hạn.
+- Bản sách trả về/nhập mới chỉ được giữ cho người chờ còn đủ điều kiện mượn; người không đủ điều kiện vẫn ở `CHO_XU_LY` và có `thu_tu_cho = null` trong `GET /me/dat-truoc` và `GET /bao-cao/dat-truoc`.
+- Dữ liệu mẫu đổi (nạp lại `99_full_setup.sql`): lượt chờ S004 đầu tiên là SV007 (đang tạm khóa) thay cho SV001; `BS012` đang giữ cho GV001 thay cho SV005.

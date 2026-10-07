@@ -15,7 +15,8 @@ USE qltv_nhom8;
 -- Chống mượn trùng/đặt trước trùng khi chạy đồng thời dựa vào UNIQUE (cột sinh tự động) + khóa hàng trong trigger.
 DELIMITER $$
 
--- Nội bộ: bản sách vừa được giải phóng -> giao cho người đặt trước sớm nhất, nếu không có thì SAN_SANG.
+-- Nội bộ: bản sách vừa được giải phóng -> giao cho người đặt trước sớm nhất còn đủ điều kiện đặt trước (bỏ qua người
+-- không hoạt động, đang quá hạn, còn nợ phạt; lượt đặt của họ vẫn chờ), nếu không có ai thì SAN_SANG.
 -- Không tự mở transaction (xem đầu file).
 DROP PROCEDURE IF EXISTS sp_cap_phat_ban_sach$$
 CREATE PROCEDURE sp_cap_phat_ban_sach(IN p_ban_sach_id BIGINT)
@@ -30,10 +31,9 @@ BEGIN
 
     SELECT d.id, d.nguoi_dung_id INTO v_dt_id, v_nguoi_dung_id
     FROM dat_truoc d
-    JOIN nguoi_dung nd ON nd.id = d.nguoi_dung_id
     WHERE d.sach_id = v_sach_id
       AND d.trang_thai = 'CHO_XU_LY'
-      AND nd.trang_thai = 'HOAT_DONG'
+      AND fn_ly_do_khong_the_dat_truoc(d.nguoi_dung_id) IS NULL
     ORDER BY d.ngay_dat, d.id
     LIMIT 1
     FOR UPDATE;
@@ -289,12 +289,14 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Nguoi dung khong hoat dong';
     END IF;
 
+    -- chỉ tính người chờ còn đủ điều kiện (như sp_cap_phat_ban_sach)
     IF EXISTS (
         SELECT 1
         FROM dat_truoc
         WHERE sach_id = v_sach_id
           AND trang_thai = 'CHO_XU_LY'
           AND nguoi_dung_id <> v_nguoi_dung_id
+          AND fn_ly_do_khong_the_dat_truoc(nguoi_dung_id) IS NULL
     ) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sach dang co nguoi dat truoc, khong the gia han';
     END IF;
@@ -650,7 +652,8 @@ BEGIN
     END IF;
 END$$
 
--- Nhập p_so_ban bản mới cho một đầu sách, mã tự sinh tiếp theo mã lớn nhất dạng BSnnn. Bản mới vào SAN_SANG, hoặc
+-- Nhập p_so_ban bản mới cho một đầu sách, mã tự sinh tiếp theo mã lớn nhất dạng BSnnn (tối đa 9 chữ số; mã dài hơn
+-- bị bỏ qua để không tràn số). Bản mới vào SAN_SANG, hoặc
 -- DANG_GIU nếu đầu sách đang có người chờ (trg_ban_sach_bi/ai). Trả về danh sách bản vừa nhập.
 -- Khóa dòng sach để hai lần nhập cùng đầu sách không xen nhau. Hai lần nhập ĐỒNG THỜI cho hai đầu sách khác nhau có thể
 -- sinh trùng mã: lần sau lỗi trùng khóa (1062) và được hoàn tác toàn bộ, ứng dụng chỉ cần gọi lại.
@@ -696,7 +699,7 @@ BEGIN
 
     SELECT COALESCE(MAX(CAST(SUBSTRING(ma_ban_sach, 3) AS UNSIGNED)), 0) INTO v_so
     FROM ban_sach
-    WHERE ma_ban_sach REGEXP '^BS[0-9]+$';
+    WHERE ma_ban_sach REGEXP '^BS[0-9]{1,9}$';
 
     WHILE v_i < p_so_ban DO
         SET v_i = v_i + 1;

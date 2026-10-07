@@ -176,12 +176,14 @@ INSERT INTO phieu_phat (ct_phieu_muon_id, loai_phat, so_tien, ly_do, trang_thai,
 (18,'QUA_HAN',15000,'Trả trễ 3 ngày','DA_THANH_TOAN',DATE_SUB(CURDATE(),INTERVAL 38 DAY),DATE_SUB(CURDATE(),INTERVAL 36 DAY));
 
 -- Đặt trước: chỉ đặt khi đầu sách không còn bản sẵn sàng; han_giu chỉ có khi đã giữ bản sách.
+-- Lượt đang hoạt động: người đặt đủ điều kiện lúc đặt (#1: SV007 đặt khi còn hoạt động, bị tạm khóa sau đó nên
+-- đang bị bỏ qua trong hàng chờ); bản đang giữ chỉ giữ cho người đủ điều kiện (#5). Lượt DA_NHAN mượn trong hạn giữ.
 INSERT INTO dat_truoc (nguoi_dung_id, sach_id, ban_sach_id, ngay_dat, han_giu, trang_thai) VALUES
-(1,4,NULL,DATE_SUB(NOW(),INTERVAL 2 DAY),NULL,'CHO_XU_LY'),
+(7,4,NULL,DATE_SUB(NOW(),INTERVAL 10 DAY),NULL,'CHO_XU_LY'),
 (2,6,NULL,DATE_SUB(NOW(),INTERVAL 1 DAY),NULL,'CHO_XU_LY'),
-(3,8,NULL,DATE_SUB(NOW(),INTERVAL 5 DAY),DATE_SUB(NOW(),INTERVAL 1 DAY),'HET_HAN'),
-(4,1,2,DATE_SUB(NOW(),INTERVAL 50 DAY),DATE_SUB(NOW(),INTERVAL 47 DAY),'DA_NHAN'),
-(5,10,12,DATE_SUB(NOW(),INTERVAL 3 DAY),DATE_ADD(NOW(),INTERVAL 1 DAY),'SAN_SANG_NHAN'),
+(3,8,NULL,DATE_SUB(NOW(),INTERVAL 5 DAY),NULL,'HUY'),
+(4,1,2,DATE_SUB(NOW(),INTERVAL 50 DAY),DATE_SUB(NOW(),INTERVAL 44 DAY),'DA_NHAN'),
+(9,10,12,DATE_SUB(NOW(),INTERVAL 3 DAY),DATE_ADD(NOW(),INTERVAL 1 DAY),'SAN_SANG_NHAN'),
 (6,11,NULL,DATE_SUB(NOW(),INTERVAL 2 DAY),NULL,'CHO_XU_LY'),
 (8,14,NULL,DATE_SUB(NOW(),INTERVAL 8 DAY),NULL,'HUY'),
 (9,15,NULL,DATE_SUB(NOW(),INTERVAL 1 DAY),NULL,'CHO_XU_LY'),
@@ -203,4 +205,5 @@ INSERT INTO nhat_ky_hanh_vi (nguoi_dung_id, loai_hanh_vi, doi_tuong, doi_tuong_i
 (1,'VI_PHAM','CT_PHIEU_MUON',10,'Làm mất sách',DATE_SUB(NOW(),INTERVAL 70 DAY)),
 (9,'GIA_HAN','CT_PHIEU_MUON',8,'Gia hạn mượn sách',DATE_SUB(NOW(),INTERVAL 40 DAY)),
 (3,'DAT_TRUOC','DAT_TRUOC',3,'Đặt trước sách',DATE_SUB(NOW(),INTERVAL 5 DAY)),
+(7,'DOI_TRANG_THAI_ND','NGUOI_DUNG',7,'HOAT_DONG -> TAM_KHOA',DATE_SUB(NOW(),INTERVAL 4 DAY)),
 (4,'TRA_CUU','SACH',14,'Tra cứu Clean Code',DATE_SUB(NOW(),INTERVAL 1 DAY));

@@ -421,12 +421,14 @@ INSERT INTO phieu_phat (ct_phieu_muon_id, loai_phat, so_tien, ly_do, trang_thai,
 (18,'QUA_HAN',15000,'Trả trễ 3 ngày','DA_THANH_TOAN',DATE_SUB(CURDATE(),INTERVAL 38 DAY),DATE_SUB(CURDATE(),INTERVAL 36 DAY));
 
 -- Đặt trước: chỉ đặt khi đầu sách không còn bản sẵn sàng; han_giu chỉ có khi đã giữ bản sách.
+-- Lượt đang hoạt động: người đặt đủ điều kiện lúc đặt (#1: SV007 đặt khi còn hoạt động, bị tạm khóa sau đó nên
+-- đang bị bỏ qua trong hàng chờ); bản đang giữ chỉ giữ cho người đủ điều kiện (#5). Lượt DA_NHAN mượn trong hạn giữ.
 INSERT INTO dat_truoc (nguoi_dung_id, sach_id, ban_sach_id, ngay_dat, han_giu, trang_thai) VALUES
-(1,4,NULL,DATE_SUB(NOW(),INTERVAL 2 DAY),NULL,'CHO_XU_LY'),
+(7,4,NULL,DATE_SUB(NOW(),INTERVAL 10 DAY),NULL,'CHO_XU_LY'),
 (2,6,NULL,DATE_SUB(NOW(),INTERVAL 1 DAY),NULL,'CHO_XU_LY'),
-(3,8,NULL,DATE_SUB(NOW(),INTERVAL 5 DAY),DATE_SUB(NOW(),INTERVAL 1 DAY),'HET_HAN'),
-(4,1,2,DATE_SUB(NOW(),INTERVAL 50 DAY),DATE_SUB(NOW(),INTERVAL 47 DAY),'DA_NHAN'),
-(5,10,12,DATE_SUB(NOW(),INTERVAL 3 DAY),DATE_ADD(NOW(),INTERVAL 1 DAY),'SAN_SANG_NHAN'),
+(3,8,NULL,DATE_SUB(NOW(),INTERVAL 5 DAY),NULL,'HUY'),
+(4,1,2,DATE_SUB(NOW(),INTERVAL 50 DAY),DATE_SUB(NOW(),INTERVAL 44 DAY),'DA_NHAN'),
+(9,10,12,DATE_SUB(NOW(),INTERVAL 3 DAY),DATE_ADD(NOW(),INTERVAL 1 DAY),'SAN_SANG_NHAN'),
 (6,11,NULL,DATE_SUB(NOW(),INTERVAL 2 DAY),NULL,'CHO_XU_LY'),
 (8,14,NULL,DATE_SUB(NOW(),INTERVAL 8 DAY),NULL,'HUY'),
 (9,15,NULL,DATE_SUB(NOW(),INTERVAL 1 DAY),NULL,'CHO_XU_LY'),
@@ -448,6 +450,7 @@ INSERT INTO nhat_ky_hanh_vi (nguoi_dung_id, loai_hanh_vi, doi_tuong, doi_tuong_i
 (1,'VI_PHAM','CT_PHIEU_MUON',10,'Làm mất sách',DATE_SUB(NOW(),INTERVAL 70 DAY)),
 (9,'GIA_HAN','CT_PHIEU_MUON',8,'Gia hạn mượn sách',DATE_SUB(NOW(),INTERVAL 40 DAY)),
 (3,'DAT_TRUOC','DAT_TRUOC',3,'Đặt trước sách',DATE_SUB(NOW(),INTERVAL 5 DAY)),
+(7,'DOI_TRANG_THAI_ND','NGUOI_DUNG',7,'HOAT_DONG -> TAM_KHOA',DATE_SUB(NOW(),INTERVAL 4 DAY)),
 (4,'TRA_CUU','SACH',14,'Tra cứu Clean Code',DATE_SUB(NOW(),INTERVAL 1 DAY));
 
 
@@ -667,7 +670,8 @@ USE qltv_nhom8;
 -- Chống mượn trùng/đặt trước trùng khi chạy đồng thời dựa vào UNIQUE (cột sinh tự động) + khóa hàng trong trigger.
 DELIMITER $$
 
--- Nội bộ: bản sách vừa được giải phóng -> giao cho người đặt trước sớm nhất, nếu không có thì SAN_SANG.
+-- Nội bộ: bản sách vừa được giải phóng -> giao cho người đặt trước sớm nhất còn đủ điều kiện đặt trước (bỏ qua người
+-- không hoạt động, đang quá hạn, còn nợ phạt; lượt đặt của họ vẫn chờ), nếu không có ai thì SAN_SANG.
 -- Không tự mở transaction (xem đầu file).
 DROP PROCEDURE IF EXISTS sp_cap_phat_ban_sach$$
 CREATE PROCEDURE sp_cap_phat_ban_sach(IN p_ban_sach_id BIGINT)
@@ -682,10 +686,9 @@ BEGIN
 
     SELECT d.id, d.nguoi_dung_id INTO v_dt_id, v_nguoi_dung_id
     FROM dat_truoc d
-    JOIN nguoi_dung nd ON nd.id = d.nguoi_dung_id
     WHERE d.sach_id = v_sach_id
       AND d.trang_thai = 'CHO_XU_LY'
-      AND nd.trang_thai = 'HOAT_DONG'
+      AND fn_ly_do_khong_the_dat_truoc(d.nguoi_dung_id) IS NULL
     ORDER BY d.ngay_dat, d.id
     LIMIT 1
     FOR UPDATE;
@@ -941,12 +944,14 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Nguoi dung khong hoat dong';
     END IF;
 
+    -- chỉ tính người chờ còn đủ điều kiện (như sp_cap_phat_ban_sach)
     IF EXISTS (
         SELECT 1
         FROM dat_truoc
         WHERE sach_id = v_sach_id
           AND trang_thai = 'CHO_XU_LY'
           AND nguoi_dung_id <> v_nguoi_dung_id
+          AND fn_ly_do_khong_the_dat_truoc(nguoi_dung_id) IS NULL
     ) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sach dang co nguoi dat truoc, khong the gia han';
     END IF;
@@ -1302,7 +1307,8 @@ BEGIN
     END IF;
 END$$
 
--- Nhập p_so_ban bản mới cho một đầu sách, mã tự sinh tiếp theo mã lớn nhất dạng BSnnn. Bản mới vào SAN_SANG, hoặc
+-- Nhập p_so_ban bản mới cho một đầu sách, mã tự sinh tiếp theo mã lớn nhất dạng BSnnn (tối đa 9 chữ số; mã dài hơn
+-- bị bỏ qua để không tràn số). Bản mới vào SAN_SANG, hoặc
 -- DANG_GIU nếu đầu sách đang có người chờ (trg_ban_sach_bi/ai). Trả về danh sách bản vừa nhập.
 -- Khóa dòng sach để hai lần nhập cùng đầu sách không xen nhau. Hai lần nhập ĐỒNG THỜI cho hai đầu sách khác nhau có thể
 -- sinh trùng mã: lần sau lỗi trùng khóa (1062) và được hoàn tác toàn bộ, ứng dụng chỉ cần gọi lại.
@@ -1348,7 +1354,7 @@ BEGIN
 
     SELECT COALESCE(MAX(CAST(SUBSTRING(ma_ban_sach, 3) AS UNSIGNED)), 0) INTO v_so
     FROM ban_sach
-    WHERE ma_ban_sach REGEXP '^BS[0-9]+$';
+    WHERE ma_ban_sach REGEXP '^BS[0-9]{1,9}$';
 
     WHILE v_i < p_so_ban DO
         SET v_i = v_i + 1;
@@ -1678,7 +1684,7 @@ USE qltv_nhom8;
 DELIMITER $$
 
 -- Bản sách mới nhập: không được nhập thẳng ở trạng thái đang mượn/đang giữ. Nếu đầu sách đang có người
--- chờ (CHO_XU_LY) thì bản mới chuyển DANG_GIU ngay (trg_ban_sach_ai giao cho người đặt sớm nhất), tránh
+-- chờ (CHO_XU_LY, còn đủ điều kiện đặt trước) thì bản mới chuyển DANG_GIU ngay (trg_ban_sach_ai giao cho người đặt sớm nhất), tránh
 -- để người ngoài hàng đợi mượn mất. Không thể CALL sp_cap_phat_ban_sach ở đây vì thủ tục đó UPDATE
 -- chính bảng ban_sach (MySQL cấm sửa bảng đang được câu lệnh gọi trigger sử dụng).
 DROP TRIGGER IF EXISTS trg_ban_sach_bi$$
@@ -1695,10 +1701,9 @@ BEGIN
     IF NEW.tinh_trang = 'SAN_SANG' THEN
         SELECT d.id INTO v_dt_id
         FROM dat_truoc d
-        JOIN nguoi_dung nd ON nd.id = d.nguoi_dung_id
         WHERE d.sach_id = NEW.sach_id
           AND d.trang_thai = 'CHO_XU_LY'
-          AND nd.trang_thai = 'HOAT_DONG'
+          AND fn_ly_do_khong_the_dat_truoc(d.nguoi_dung_id) IS NULL
         ORDER BY d.ngay_dat, d.id
         LIMIT 1
         FOR UPDATE;
@@ -1720,10 +1725,9 @@ BEGIN
     IF NEW.tinh_trang = 'DANG_GIU' THEN
         SELECT d.id, d.nguoi_dung_id INTO v_dt_id, v_nguoi_dung_id
         FROM dat_truoc d
-        JOIN nguoi_dung nd ON nd.id = d.nguoi_dung_id
         WHERE d.sach_id = NEW.sach_id
           AND d.trang_thai = 'CHO_XU_LY'
-          AND nd.trang_thai = 'HOAT_DONG'
+          AND fn_ly_do_khong_the_dat_truoc(d.nguoi_dung_id) IS NULL
         ORDER BY d.ngay_dat, d.id
         LIMIT 1
         FOR UPDATE;
@@ -1929,12 +1933,14 @@ BEGIN
         FROM ban_sach
         WHERE id = NEW.ban_sach_id;
 
+        -- chỉ tính người chờ còn đủ điều kiện (như sp_cap_phat_ban_sach)
         IF EXISTS (
             SELECT 1
             FROM dat_truoc
             WHERE sach_id = v_sach_id
               AND trang_thai = 'CHO_XU_LY'
               AND nguoi_dung_id <> v_nguoi_dung_id
+              AND fn_ly_do_khong_the_dat_truoc(nguoi_dung_id) IS NULL
         ) THEN
             SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sach dang co nguoi dat truoc, khong the gia han';
         END IF;
@@ -1997,7 +2003,7 @@ END$$
 
 -- Chỉ kiểm tra khi tạo lượt đặt đang hoạt động (chèn dữ liệu lịch sử DA_NHAN/HUY/HET_HAN thì bỏ qua).
 -- Người đang bị chặn mượn (không hoạt động, giữ sách quá hạn, nợ phạt) cũng không được đặt trước,
--- tránh việc được giữ sách rồi không mượn nổi.
+-- tránh việc được giữ sách rồi không mượn nổi. Người đang mượn một bản của đầu sách thì không tự đặt trước đầu sách đó.
 DROP TRIGGER IF EXISTS trg_dat_truoc_bi$$
 CREATE TRIGGER trg_dat_truoc_bi
 BEFORE INSERT ON dat_truoc
@@ -2020,6 +2026,18 @@ BEGIN
 
         IF v_count > 0 THEN
             SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Da co dat truoc dang hoat dong';
+        END IF;
+
+        IF EXISTS (
+            SELECT 1
+            FROM ct_phieu_muon c
+            JOIN phieu_muon p ON p.id = c.phieu_muon_id
+            JOIN ban_sach b ON b.id = c.ban_sach_id
+            WHERE p.nguoi_dung_id = NEW.nguoi_dung_id
+              AND b.sach_id = NEW.sach_id
+              AND c.ngay_tra IS NULL
+        ) THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Dang muon dau sach nay, khong dat truoc duoc';
         END IF;
     END IF;
 END$$
@@ -2064,6 +2082,7 @@ BEGIN
     END IF;
 END$$
 
+-- Khóa tài khoản hoặc đổi mật khẩu thì thu hồi mọi phiên đang mở (mở khóa lại không làm token cũ dùng lại được).
 DROP TRIGGER IF EXISTS trg_tai_khoan_bu$$
 CREATE TRIGGER trg_tai_khoan_bu
 BEFORE UPDATE ON tai_khoan
@@ -2083,6 +2102,11 @@ BEGIN
 
     IF NEW.trang_thai = 'HOAT_DONG' AND v_trang_thai <> 'HOAT_DONG' THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Nguoi dung khong hoat dong, tai khoan phai o trang thai KHOA';
+    END IF;
+
+    IF (NEW.trang_thai = 'KHOA' AND OLD.trang_thai <> 'KHOA') OR NEW.mat_khau_hash <> OLD.mat_khau_hash THEN
+        UPDATE phien_dang_nhap SET da_dang_xuat = TRUE
+        WHERE nguoi_dung_id = NEW.nguoi_dung_id AND da_dang_xuat = FALSE;
     END IF;
 END$$
 
@@ -2468,7 +2492,7 @@ JOIN ban_sach bs ON bs.id = c.ban_sach_id
 JOIN sach s ON s.id = bs.sach_id;
 
 -- Đặt trước: bản sách đang giữ (khi SAN_SANG_NHAN) và thứ tự trong hàng chờ (khi CHO_XU_LY). Thứ tự tính như
--- sp_cap_phat_ban_sach chọn người: chỉ người đang HOAT_DONG, theo ngay_dat rồi id; người không hoạt động thì NULL.
+-- sp_cap_phat_ban_sach chọn người: chỉ người còn đủ điều kiện đặt trước, theo ngay_dat rồi id; người không đủ thì NULL.
 CREATE OR REPLACE VIEW vw_dat_truoc AS
 SELECT
     nd.ma_nguoi_dung,
@@ -2479,13 +2503,12 @@ SELECT
     d.trang_thai,
     bs.ma_ban_sach,
     d.han_giu,
-    CASE WHEN d.trang_thai = 'CHO_XU_LY' AND nd.trang_thai = 'HOAT_DONG' THEN (
+    CASE WHEN d.trang_thai = 'CHO_XU_LY' AND fn_ly_do_khong_the_dat_truoc(d.nguoi_dung_id) IS NULL THEN (
         SELECT COUNT(*)
         FROM dat_truoc d2
-        JOIN nguoi_dung n2 ON n2.id = d2.nguoi_dung_id
         WHERE d2.sach_id = d.sach_id
           AND d2.trang_thai = 'CHO_XU_LY'
-          AND n2.trang_thai = 'HOAT_DONG'
+          AND fn_ly_do_khong_the_dat_truoc(d2.nguoi_dung_id) IS NULL
           AND (d2.ngay_dat < d.ngay_dat OR (d2.ngay_dat = d.ngay_dat AND d2.id <= d.id))
     ) END AS thu_tu_cho
 FROM dat_truoc d

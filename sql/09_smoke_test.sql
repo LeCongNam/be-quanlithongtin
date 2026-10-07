@@ -28,7 +28,7 @@ SELECT * FROM vw_muon_qua_han;
 SELECT * FROM vw_nguoi_dung_vi_pham;
 SELECT * FROM vw_top_sach_muon_nhieu LIMIT 10;
 SELECT * FROM vw_thong_ke_tien_phat ORDER BY thang, loai_phat;
-SELECT * FROM vw_dat_truoc WHERE trang_thai IN ('CHO_XU_LY', 'SAN_SANG_NHAN') ORDER BY ma_sach, thu_tu_cho;  -- S004: SV001 thứ 1, GV002 thứ 2
+SELECT * FROM vw_dat_truoc WHERE trang_thai IN ('CHO_XU_LY', 'SAN_SANG_NHAN') ORDER BY ma_sach, thu_tu_cho;  -- S004: SV007 NULL (đang tạm khóa, không xếp hàng), GV002 thứ 1
 SELECT * FROM vw_lich_su_muon WHERE ma_nguoi_dung = 'SV001' ORDER BY ngay_muon DESC;   -- kỳ vọng 2 dòng: BS001 đang mượn, BS019 đã MAT
 CALL sp_tra_cuu_sach('Tanenbaum', 'SV004');   -- kỳ vọng 3 dòng: S006, S008, S015 (khớp theo tác giả)
 CALL sp_tra_cuu_sach('cơ sở', 'SV004');       -- kỳ vọng 2 dòng: S001, S002 (âm tiết 2 ký tự; không dấu 'co so' cũng vậy)
@@ -57,7 +57,8 @@ CALL sp_tra_sach('BS002', 'BINH_THUONG');
 SELECT trang_thai AS trang_thai_phieu_sau_khi_tra FROM phieu_muon WHERE ma_phieu = @ma_phieu;
 
 -- D2. Trả sách quá hạn của SV004 (BS006, quá hạn 4 ngày): đúng 1 phiếu QUA_HAN 20.000đ.
---     SV001 và GV002 đang chờ sách này (S004): bản sách được giữ cho người đặt sớm nhất (SV001).
+--     SV007 và GV002 đang chờ sách này (S004). SV007 đặt sớm hơn nhưng đang bị tạm khóa (không mượn được)
+--     nên bị bỏ qua: bản được giữ cho GV002, lượt đặt của SV007 vẫn CHO_XU_LY.
 CALL sp_tra_sach('BS006', 'BINH_THUONG');
 SELECT loai_phat, so_tien FROM phieu_phat WHERE ct_phieu_muon_id = 4;
 SELECT ma_ban_sach, tinh_trang FROM ban_sach WHERE ma_ban_sach = 'BS006';
@@ -74,8 +75,8 @@ CALL sp_dat_truoc('SV002', 'S008');
 CALL sp_cap_nhat_tinh_trang_ban_sach('BS010', 'SAN_SANG');
 SELECT ma_ban_sach, tinh_trang FROM ban_sach WHERE ma_ban_sach = 'BS010';
 
--- D5. Nhập bản sách mới cho S004 (GV002 vẫn đang chờ): bản mới phải là DANG_GIU và lượt đặt của GV002
---     chuyển SAN_SANG_NHAN, không được để SAN_SANG cho người ngoài hàng đợi.
+-- D5. Nhập bản sách mới cho S004: người còn chờ chỉ có SV007 (đang tạm khóa) nên bản mới SAN_SANG, không giữ
+--     cho người không mượn được (kỳ vọng truy vấn thứ hai rỗng). Nhánh giữ bản mới cho người đủ điều kiện: test L9d.
 INSERT INTO ban_sach (ma_ban_sach, sach_id, vi_tri_ke, ngay_nhap)
 VALUES ('BS099', (SELECT id FROM sach WHERE ma_sach = 'S004'), 'A2-02', CURDATE());
 SELECT ma_ban_sach, tinh_trang FROM ban_sach WHERE ma_ban_sach = 'BS099';
@@ -122,6 +123,7 @@ SET autocommit = 1;
 -- CALL sp_tao_phieu_muon('SV007', 'CB001', @x);   -- SV007: đang tạm khóa
 -- CALL sp_gia_han('BS006', 7);                    -- sách đã quá hạn
 -- CALL sp_dat_truoc('SV002', 'S001');             -- S001 còn bản sẵn sàng
+-- CALL sp_dat_truoc('SV002', 'S002');             -- (khi S002 hết bản) SV002 đang mượn BS003 của S002 nên không tự đặt trước
 -- CALL sp_tra_sach('BS002', 'BINH_THUONG');       -- BS002 không có lượt mượn đang mở
 -- CALL sp_dat_truoc('SV005', 'S001');             -- (khi S001 hết bản) SV005 còn nợ phạt nên bị chặn đặt trước
 -- UPDATE tai_khoan SET vai_tro = 'ADMIN' WHERE ten_dang_nhap = 'sv001';   -- vai trò không phù hợp loại người dùng

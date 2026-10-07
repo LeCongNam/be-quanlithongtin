@@ -53,12 +53,12 @@ BEGIN
     SELECT gia_tri, don_vi, mo_ta INTO v_gia_tri, v_don_vi, v_mo_ta
     FROM tham_so WHERE ma_tham_so = 'SO_NGAY_GIU_DAT_TRUOC';
 
-    -- L1a. SV005 đang được giữ BS012 (S010); SV002 xếp hàng sau. Hủy lượt của SV005 khi thiếu tham số.
+    -- L1a. GV001 đang được giữ BS012 (S010); SV002 xếp hàng sau. Hủy lượt của GV001 khi thiếu tham số.
     CALL sp_dat_truoc('SV002', 'S010');
     DELETE FROM tham_so WHERE ma_tham_so = 'SO_NGAY_GIU_DAT_TRUOC';
     BEGIN
         DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET v_loi = 1;
-        CALL sp_huy_dat_truoc('SV005', 'S010');
+        CALL sp_huy_dat_truoc('GV001', 'S010');
     END;
     INSERT INTO tham_so(ma_tham_so, gia_tri, don_vi, mo_ta)
     VALUES('SO_NGAY_GIU_DAT_TRUOC', v_gia_tri, v_don_vi, v_mo_ta);
@@ -67,9 +67,9 @@ BEGIN
     CALL t_kiem_tra('L1a', (SELECT d.trang_thai FROM dat_truoc d
                             JOIN nguoi_dung nd ON nd.id = d.nguoi_dung_id
                             JOIN sach s ON s.id = d.sach_id
-                            WHERE nd.ma_nguoi_dung = 'SV005' AND s.ma_sach = 'S010'
+                            WHERE nd.ma_nguoi_dung = 'GV001' AND s.ma_sach = 'S010'
                             ORDER BY d.id DESC LIMIT 1) = 'SAN_SANG_NHAN',
-                    'Luot dat cua SV005 van SAN_SANG_NHAN (khong bi doi sang HUY)');
+                    'Luot dat cua GV001 van SAN_SANG_NHAN (khong bi doi sang HUY)');
     CALL t_kiem_tra('L1a', (SELECT tinh_trang FROM ban_sach WHERE ma_ban_sach = 'BS012') = 'DANG_GIU',
                     'BS012 van DANG_GIU va con nguoi giu');
     CALL t_kiem_tra('L1a', (SELECT COUNT(*) FROM dat_truoc
@@ -126,9 +126,9 @@ BEGIN
                     'Co lai tham so: BS012 chuyen sang giu cho SV002');
     SELECT COUNT(*) INTO v_so_dat_truoc FROM dat_truoc d
     JOIN nguoi_dung nd ON nd.id = d.nguoi_dung_id
-    WHERE nd.ma_nguoi_dung = 'SV005' AND d.trang_thai = 'HET_HAN'
+    WHERE nd.ma_nguoi_dung = 'GV001' AND d.trang_thai = 'HET_HAN'
       AND d.sach_id = (SELECT id FROM sach WHERE ma_sach = 'S010');
-    CALL t_kiem_tra('L1c', v_so_dat_truoc = 1, 'Luot giu cua SV005 chuyen HET_HAN');
+    CALL t_kiem_tra('L1c', v_so_dat_truoc = 1, 'Luot giu cua GV001 chuyen HET_HAN');
 
     -- L1d. Bên gọi tự quản lý transaction (autocommit = 0): procedure không tự COMMIT, ROLLBACK của bên gọi hủy được.
     SELECT COUNT(*) INTO v_so_phieu_truoc FROM phieu_muon;
@@ -606,13 +606,14 @@ BEGIN
     CALL t_gia_tri("(SELECT COUNT(*) FROM information_schema.events
                      WHERE event_schema = 'qltv_nhom8' AND event_name = 'ev_don_phien_dang_nhap')");
     CALL t_kiem_tra('L7d', @t_kq = '1', 'Co event ev_don_phien_dang_nhap');
-    -- chạy thân event: xóa phiên đã đăng xuất (@t7_a) và phiên quá hạn (@t7_b), giữ 2 phiên còn lại (@t7_a2, @t7_b2)
+    -- chạy thân event: xóa phiên đã đăng xuất (@t7_a), phiên quá hạn (@t7_b) và phiên của T7B bị thu hồi khi khóa
+    -- tài khoản (@t7_b2, #49); chỉ còn phiên @t7_a2
     SET @t7_ev = (SELECT event_definition FROM information_schema.events
                   WHERE event_schema = 'qltv_nhom8' AND event_name = 'ev_don_phien_dang_nhap');
     CALL t_chay(@t7_ev, v_loi, v_msg);
     CALL t_gia_tri("(SELECT COUNT(*) FROM phien_dang_nhap WHERE nguoi_dung_id IN
                       (SELECT id FROM nguoi_dung WHERE ma_nguoi_dung IN ('T7A', 'T7B')))");
-    CALL t_kiem_tra('L7d', v_loi = 0 AND @t_kq = '2', 'Event xoa phien da dang xuat va qua han, giu phien con han');
+    CALL t_kiem_tra('L7d', v_loi = 0 AND @t_kq = '1', 'Event xoa phien da dang xuat/qua han/bi thu hoi, giu phien con han');
     CALL t_gia_tri('fn_nguoi_dung_tu_token(@t7_a2)');
     CALL t_kiem_tra('L7d', @t_kq = 'T7A', 'Phien con han van dung duoc sau khi event chay');
 
@@ -890,8 +891,191 @@ BEGIN
         'Da don sach du lieu thu L9');
 END$$
 
+-- L10 (#49): (a) khóa tài khoản hoặc đổi mật khẩu không thu hồi phiên: khóa rồi mở lại thì token cũ dùng lại được;
+-- (b) cấp bản cho người đặt trước chỉ xét HOAT_DONG: bản bị giữ cho người đang quá hạn/nợ phạt (không mượn được),
+-- chặn người khác tới hết hạn giữ; (c) một mã bản sách 'BS' + 20 chữ số làm sp_them_ban_sach lỗi 1264 mãi.
+-- Chạy với autocommit = 1 trên dữ liệu thử riêng (T10A, T10B, S_T10, S_T10X), dọn sạch ở cuối.
+DROP PROCEDURE IF EXISTS t_l10$$
+CREATE PROCEDURE t_l10()
+BEGIN
+    DECLARE v_loi INT;
+    DECLARE v_msg VARCHAR(512);
+    DECLARE v_max_bs BIGINT;
+
+    INSERT INTO nguoi_dung(ma_nguoi_dung, ho_ten, loai_nguoi_dung, email)
+    VALUES('T10A', 'Test L10 A', 'SINH_VIEN', 't10a@test.vn'), ('T10B', 'Test L10 B', 'SINH_VIEN', 't10b@test.vn');
+    INSERT INTO tai_khoan(nguoi_dung_id, ten_dang_nhap, muoi, mat_khau_hash, vai_tro)
+    SELECT id, LOWER(ma_nguoi_dung), REPEAT('c', 32), SHA2(CONCAT(REPEAT('c', 32), 'Mk_Test_10'), 256), 'BAN_DOC'
+    FROM nguoi_dung WHERE ma_nguoi_dung IN ('T10A', 'T10B');
+    SET @t10_a = NULL, @t10_b = NULL, @t10_b2 = NULL;
+    CALL sp_dang_nhap('t10a', 'Mk_Test_10', @t10_a);
+    CALL sp_dang_nhap('t10b', 'Mk_Test_10', @t10_b);
+
+    -- L10a. Khóa rồi mở lại: phiên cũ phải chết; phiên của người khác không bị ảnh hưởng
+    CALL sp_doi_trang_thai_nguoi_dung('T10B', 'TAM_KHOA');
+    CALL sp_doi_trang_thai_nguoi_dung('T10B', 'HOAT_DONG');
+    UPDATE tai_khoan SET trang_thai = 'HOAT_DONG' WHERE ten_dang_nhap = 't10b';
+    CALL t_kiem_tra('L10a', fn_nguoi_dung_tu_token(@t10_b) IS NULL,
+        'Khoa roi mo lai tai khoan: token cu khong dung lai duoc');
+    CALL t_kiem_tra('L10a', fn_nguoi_dung_tu_token(@t10_a) = 'T10A' COLLATE utf8mb4_unicode_ci, 'Phien cua nguoi khac van con hieu luc');
+    -- Đổi mật khẩu: phiên cũ chết, đăng nhập lại bằng mật khẩu mới được
+    CALL sp_dang_nhap('t10b', 'Mk_Test_10', @t10_b2);
+    UPDATE tai_khoan SET mat_khau_hash = SHA2(CONCAT(muoi, 'Mk_Moi_10'), 256) WHERE ten_dang_nhap = 't10b';
+    CALL t_kiem_tra('L10a', fn_nguoi_dung_tu_token(@t10_b2) IS NULL, 'Doi mat khau: token cu khong dung duoc');
+    CALL t_chay("CALL sp_dang_nhap('t10b', 'Mk_Moi_10', @t10_b2)", v_loi, v_msg);
+    CALL t_kiem_tra('L10a', v_loi = 0 AND fn_nguoi_dung_tu_token(@t10_b2) = 'T10B' COLLATE utf8mb4_unicode_ci, 'Dang nhap lai bang mat khau moi duoc');
+
+    -- L10c. Mã bản sách lạ (quá 9 chữ số) không làm hỏng việc sinh mã của sp_them_ban_sach
+    CALL sp_them_sach('S_T10', NULL, 'Sach thu L10', 'TL01', 'NXB01', 2025, NULL, 100000, NULL, 'TG01');
+    CALL sp_them_sach('S_T10X', NULL, 'Sach thu L10 X', 'TL01', 'NXB01', 2025, NULL, 100000, NULL, 'TG01');
+    INSERT INTO ban_sach(ma_ban_sach, sach_id, vi_tri_ke, ngay_nhap)
+    SELECT 'BS99999999999999999999', id, 'Z10', CURDATE() FROM sach WHERE ma_sach = 'S_T10';
+    SELECT COALESCE(MAX(CAST(SUBSTRING(ma_ban_sach, 3) AS UNSIGNED)), 0) INTO v_max_bs
+    FROM ban_sach WHERE ma_ban_sach REGEXP '^BS[0-9]{1,9}$';
+    CALL t_chay("CALL sp_them_ban_sach('S_T10', 1, 'Z10-01')", v_loi, v_msg);
+    CALL t_kiem_tra('L10c', v_loi = 0 AND EXISTS (SELECT 1 FROM ban_sach
+                       WHERE ma_ban_sach = CONCAT('BS', LPAD(v_max_bs + 1, GREATEST(3, CHAR_LENGTH(v_max_bs + 1)), '0'))
+                                           COLLATE utf8mb4_unicode_ci),
+        'Co ma BS + 20 chu so: sp_them_ban_sach van sinh ma tiep theo cua ma BSnnn binh thuong');
+    DELETE FROM ban_sach WHERE sach_id = (SELECT id FROM sach WHERE ma_sach = 'S_T10');
+    -- bản sách thử cho L10b: mã cố định (không theo dạng BSnnn), không phụ thuộc sp_them_ban_sach
+    INSERT INTO ban_sach(ma_ban_sach, sach_id, vi_tri_ke, ngay_nhap)
+    SELECT 'BST10X', id, 'Z10', CURDATE() FROM sach WHERE ma_sach = 'S_T10'
+    UNION ALL SELECT 'BST10W', id, 'Z10', CURDATE() FROM sach WHERE ma_sach = 'S_T10X';
+
+    -- L10b. T10B mượn bản duy nhất của S_T10; T10A đặt trước khi còn đủ điều kiện, sau đó quá hạn một cuốn khác
+    CALL sp_tao_phieu_muon('T10B', 'CB001', @t10_pm);
+    CALL sp_them_sach_vao_phieu(@t10_pm, 'BST10X');
+    CALL sp_dat_truoc('T10A', 'S_T10');
+    INSERT INTO phieu_muon(ma_phieu, nguoi_dung_id, nhan_vien_id, ngay_muon, trang_thai)
+    SELECT 'PM_T10', n.id, cb.id, CURDATE() - INTERVAL 20 DAY, 'DANG_MUON'
+    FROM nguoi_dung n JOIN nguoi_dung cb ON cb.ma_nguoi_dung = 'CB001' WHERE n.ma_nguoi_dung = 'T10A';
+    -- lấy id trước: INSERT ... SELECT từ ban_sach thì trigger không được ghi ban_sach (lỗi 1442)
+    SELECT id INTO @t10_pm_id FROM phieu_muon WHERE ma_phieu = 'PM_T10';
+    SELECT id INTO @t10_w_id FROM ban_sach WHERE ma_ban_sach = 'BST10W';
+    INSERT INTO ct_phieu_muon(phieu_muon_id, ban_sach_id, han_tra)
+    VALUES(@t10_pm_id, @t10_w_id, CURDATE() - INTERVAL 6 DAY);
+    CALL t_kiem_tra('L10b', (SELECT fn_ly_do_khong_the_dat_truoc(id) FROM nguoi_dung WHERE ma_nguoi_dung = 'T10A')
+                            = 'Dang giu sach qua han chua tra' COLLATE utf8mb4_unicode_ci, 'Chuan bi: T10A dang qua han, khong du dieu kien');
+    CALL t_kiem_tra('L10b', (SELECT thu_tu_cho FROM vw_dat_truoc WHERE ma_nguoi_dung = 'T10A' AND ma_sach = 'S_T10') IS NULL,
+        'vw_dat_truoc: nguoi khong du dieu kien khong co thu tu cho');
+    CALL sp_tra_sach('BST10X', 'BINH_THUONG');
+    CALL t_kiem_tra('L10b', (SELECT tinh_trang FROM ban_sach WHERE ma_ban_sach = 'BST10X') = 'SAN_SANG'
+                       AND (SELECT d.trang_thai FROM dat_truoc d JOIN nguoi_dung n ON n.id = d.nguoi_dung_id
+                            WHERE n.ma_nguoi_dung = 'T10A') = 'CHO_XU_LY',
+        'Tra sach: khong giu ban cho nguoi qua han, ban SAN_SANG, luot dat van cho');
+    CALL sp_them_ban_sach('S_T10', 1, 'Z10-03');
+    CALL t_kiem_tra('L10b', (SELECT COUNT(*) FROM ban_sach b JOIN sach s ON s.id = b.sach_id
+                             WHERE s.ma_sach = 'S_T10' AND b.tinh_trang = 'DANG_GIU') = 0,
+        'Nhap ban moi: khong giu cho nguoi qua han');
+
+    -- Dọn dữ liệu thử
+    DELETE FROM phien_dang_nhap WHERE nguoi_dung_id IN (SELECT id FROM nguoi_dung WHERE ma_nguoi_dung IN ('T10A', 'T10B'));
+    DELETE FROM nhat_ky_hanh_vi WHERE nguoi_dung_id IN (SELECT id FROM nguoi_dung WHERE ma_nguoi_dung IN ('T10A', 'T10B'));
+    DELETE FROM dat_truoc WHERE nguoi_dung_id IN (SELECT id FROM nguoi_dung WHERE ma_nguoi_dung IN ('T10A', 'T10B'));
+    DELETE FROM phieu_phat WHERE ct_phieu_muon_id IN (
+        SELECT c.id FROM ct_phieu_muon c JOIN phieu_muon p ON p.id = c.phieu_muon_id
+        WHERE p.nguoi_dung_id IN (SELECT id FROM nguoi_dung WHERE ma_nguoi_dung IN ('T10A', 'T10B')));
+    DELETE FROM ct_phieu_muon WHERE phieu_muon_id IN (
+        SELECT id FROM phieu_muon WHERE nguoi_dung_id IN (SELECT id FROM nguoi_dung WHERE ma_nguoi_dung IN ('T10A', 'T10B')));
+    DELETE FROM phieu_muon WHERE nguoi_dung_id IN (SELECT id FROM nguoi_dung WHERE ma_nguoi_dung IN ('T10A', 'T10B'));
+    DELETE FROM ban_sach WHERE sach_id IN (SELECT id FROM sach WHERE ma_sach IN ('S_T10', 'S_T10X'));
+    DELETE FROM sach_tac_gia WHERE sach_id IN (SELECT id FROM sach WHERE ma_sach IN ('S_T10', 'S_T10X'));
+    DELETE FROM sach WHERE ma_sach IN ('S_T10', 'S_T10X');
+    DELETE FROM tai_khoan WHERE nguoi_dung_id IN (SELECT id FROM nguoi_dung WHERE ma_nguoi_dung IN ('T10A', 'T10B'));
+    DELETE FROM nguoi_dung WHERE ma_nguoi_dung IN ('T10A', 'T10B');
+    CALL t_kiem_tra('L10z', (SELECT COUNT(*) FROM nguoi_dung WHERE ma_nguoi_dung LIKE 'T10%') = 0
+                        AND (SELECT COUNT(*) FROM sach WHERE ma_sach LIKE 'S\_T10%') = 0,
+        'Da don sach du lieu thu L10');
+END$$
+
+-- L11s (#50): dữ liệu mẫu đặt trước phải khớp quy tắc. Chạy TRƯỚC t_l1 (các test sau ghi đè dữ liệu mẫu).
+DROP PROCEDURE IF EXISTS t_l11_seed$$
+CREATE PROCEDURE t_l11_seed()
+BEGIN
+    -- Lượt đặt đang hoạt động: lúc đặt, người đặt không nợ phạt và không giữ sách quá hạn
+    CALL t_kiem_tra('L11s', (SELECT COUNT(*) FROM dat_truoc d
+                             WHERE d.trang_thai IN ('CHO_XU_LY', 'SAN_SANG_NHAN')
+                               AND (EXISTS (SELECT 1 FROM phieu_phat pp
+                                            JOIN ct_phieu_muon c ON c.id = pp.ct_phieu_muon_id
+                                            JOIN phieu_muon p ON p.id = c.phieu_muon_id
+                                            WHERE p.nguoi_dung_id = d.nguoi_dung_id AND pp.trang_thai <> 'HUY'
+                                              AND pp.ngay_tao <= DATE(d.ngay_dat)
+                                              AND (pp.ngay_thanh_toan IS NULL OR pp.ngay_thanh_toan > DATE(d.ngay_dat)))
+                                    OR EXISTS (SELECT 1 FROM ct_phieu_muon c
+                                               JOIN phieu_muon p ON p.id = c.phieu_muon_id
+                                               WHERE p.nguoi_dung_id = d.nguoi_dung_id AND c.han_tra < DATE(d.ngay_dat)
+                                                 AND (c.ngay_tra IS NULL OR c.ngay_tra > DATE(d.ngay_dat))))) = 0,
+        'Seed: khong co luot dat dang hoat dong cua nguoi bi chan luc dat');
+    CALL t_kiem_tra('L11s', (SELECT COUNT(*) FROM dat_truoc
+                             WHERE trang_thai = 'SAN_SANG_NHAN' AND fn_ly_do_khong_the_dat_truoc(nguoi_dung_id) IS NOT NULL) = 0,
+        'Seed: ban dang giu chi giu cho nguoi du dieu kien');
+    CALL t_kiem_tra('L11s', (SELECT COUNT(*) FROM dat_truoc
+                             WHERE trang_thai IN ('DA_NHAN', 'HET_HAN') AND (ban_sach_id IS NULL OR han_giu IS NULL)) = 0,
+        'Seed: luot DA_NHAN/HET_HAN deu da tung giu mot ban sach');
+    CALL t_kiem_tra('L11s', (SELECT COUNT(*) FROM dat_truoc d
+                             WHERE d.trang_thai = 'DA_NHAN'
+                               AND NOT EXISTS (SELECT 1 FROM ct_phieu_muon c JOIN phieu_muon p ON p.id = c.phieu_muon_id
+                                               WHERE p.nguoi_dung_id = d.nguoi_dung_id AND c.ban_sach_id = d.ban_sach_id
+                                                 AND p.ngay_muon BETWEEN DATE(d.ngay_dat) AND DATE(d.han_giu))) = 0,
+        'Seed: luot DA_NHAN co luot muon dung ban, trong han giu');
+    CALL t_kiem_tra('L11s', (SELECT COUNT(*) FROM dat_truoc d
+                             JOIN ct_phieu_muon c ON c.ngay_tra IS NULL
+                             JOIN phieu_muon p ON p.id = c.phieu_muon_id AND p.nguoi_dung_id = d.nguoi_dung_id
+                             JOIN ban_sach b ON b.id = c.ban_sach_id AND b.sach_id = d.sach_id
+                             WHERE d.trang_thai IN ('CHO_XU_LY', 'SAN_SANG_NHAN')) = 0,
+        'Seed: khong ai dat truoc dau sach minh dang muon');
+END$$
+
+-- L11 (#50): (a) không được đặt trước đầu sách mình đang mượn; (b) người chờ không đủ điều kiện (bị khóa, quá hạn,
+-- nợ phạt) không chặn người đang mượn gia hạn, giống cách sp_cap_phat_ban_sach bỏ qua họ (#49).
+DROP PROCEDURE IF EXISTS t_l11$$
+CREATE PROCEDURE t_l11()
+BEGIN
+    DECLARE v_loi INT;
+    DECLARE v_msg VARCHAR(512);
+
+    INSERT INTO nguoi_dung(ma_nguoi_dung, ho_ten, loai_nguoi_dung, email)
+    VALUES('T11A', 'Test L11 A', 'SINH_VIEN', 't11a@test.vn'), ('T11B', 'Test L11 B', 'SINH_VIEN', 't11b@test.vn');
+    CALL sp_them_sach('S_T11', NULL, 'Sach thu L11', 'TL01', 'NXB01', 2025, NULL, 100000, NULL, 'TG01');
+    INSERT INTO ban_sach(ma_ban_sach, sach_id, vi_tri_ke, ngay_nhap)
+    SELECT 'BST11X', id, 'Z11', CURDATE() FROM sach WHERE ma_sach = 'S_T11';
+    CALL sp_tao_phieu_muon('T11A', 'CB001', @t11_pm);
+    CALL sp_them_sach_vao_phieu(@t11_pm, 'BST11X');
+
+    -- L11a. T11A đang mượn bản duy nhất của S_T11: không tự đặt trước được; người khác thì được
+    CALL t_chay("CALL sp_dat_truoc('T11A', 'S_T11')", v_loi, v_msg);
+    CALL t_kiem_tra('L11a', v_loi = 1644, 'Dat truoc dau sach minh dang muon bi tu choi');
+    CALL t_chay("CALL sp_dat_truoc('T11B', 'S_T11')", v_loi, v_msg);
+    CALL t_kiem_tra('L11a', v_loi = 0, 'Nguoi khac van dat truoc duoc');
+
+    -- L11b. Người chờ đủ điều kiện vẫn chặn gia hạn; bị khóa thì không chặn nữa
+    CALL t_chay("CALL sp_gia_han('BST11X', 7)", v_loi, v_msg);
+    CALL t_kiem_tra('L11b', v_loi = 1644, 'Nguoi cho du dieu kien: khong gia han duoc');
+    CALL sp_doi_trang_thai_nguoi_dung('T11B', 'TAM_KHOA');
+    CALL t_chay("CALL sp_gia_han('BST11X', 7)", v_loi, v_msg);
+    CALL t_kiem_tra('L11b', v_loi = 0 AND (SELECT so_lan_gia_han FROM ct_phieu_muon c JOIN ban_sach b ON b.id = c.ban_sach_id
+                                           WHERE b.ma_ban_sach = 'BST11X' AND c.ngay_tra IS NULL) = 1,
+        'Nguoi cho bi khoa: gia han duoc');
+
+    -- Dọn dữ liệu thử
+    DELETE FROM nhat_ky_hanh_vi WHERE nguoi_dung_id IN (SELECT id FROM nguoi_dung WHERE ma_nguoi_dung IN ('T11A', 'T11B'));
+    DELETE FROM dat_truoc WHERE nguoi_dung_id IN (SELECT id FROM nguoi_dung WHERE ma_nguoi_dung IN ('T11A', 'T11B'));
+    DELETE FROM ct_phieu_muon WHERE phieu_muon_id IN (
+        SELECT id FROM phieu_muon WHERE nguoi_dung_id IN (SELECT id FROM nguoi_dung WHERE ma_nguoi_dung IN ('T11A', 'T11B')));
+    DELETE FROM phieu_muon WHERE nguoi_dung_id IN (SELECT id FROM nguoi_dung WHERE ma_nguoi_dung IN ('T11A', 'T11B'));
+    DELETE FROM ban_sach WHERE sach_id IN (SELECT id FROM sach WHERE ma_sach = 'S_T11');
+    DELETE FROM sach_tac_gia WHERE sach_id IN (SELECT id FROM sach WHERE ma_sach = 'S_T11');
+    DELETE FROM sach WHERE ma_sach = 'S_T11';
+    DELETE FROM nguoi_dung WHERE ma_nguoi_dung IN ('T11A', 'T11B');
+    CALL t_kiem_tra('L11z', (SELECT COUNT(*) FROM nguoi_dung WHERE ma_nguoi_dung LIKE 'T11%') = 0
+                        AND (SELECT COUNT(*) FROM sach WHERE ma_sach = 'S_T11') = 0,
+        'Da don sach du lieu thu L11');
+END$$
+
 DELIMITER ;
 
+CALL t_l11_seed();
 CALL t_l1();
 CALL t_l2();
 CALL t_l3();
@@ -901,6 +1085,8 @@ CALL t_l6();
 CALL t_l7();
 CALL t_l8();
 CALL t_l9();
+CALL t_l10();
+CALL t_l11();
 
 SELECT ma_test, ket_qua, mo_ta FROM tmp_ket_qua_test ORDER BY stt;
 
@@ -913,6 +1099,9 @@ DROP PROCEDURE t_l6;
 DROP PROCEDURE t_l7;
 DROP PROCEDURE t_l8;
 DROP PROCEDURE t_l9;
+DROP PROCEDURE t_l10;
+DROP PROCEDURE t_l11;
+DROP PROCEDURE t_l11_seed;
 DROP PROCEDURE t_chay;
 DROP PROCEDURE t_gia_tri;
 DROP PROCEDURE t_kiem_tra;
