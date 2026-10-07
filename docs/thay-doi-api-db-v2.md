@@ -49,3 +49,7 @@ Hướng dẫn dùng Swagger cho FE: xem `docs/swagger-cho-fe.md`. Thay đổi h
 - `GET /auth/me` trả thêm `iat`, `exp` (giây Unix) để FE biết khi nào token hết hạn.
 - `GET /dat-truoc` trả thêm hai cột sinh tự động `khoaDangHoatDong`, `banSachDangGiu` (FE bỏ qua).
 - Bật CORS cho origin trong biến môi trường `CORS_ORIGINS` (mặc định `http://localhost:3001,http://localhost:3000`). FE gọi qua proxy `/backend` của Next thì không cần.
+
+## `GET /sach` trả thêm `id` (2026-10-07)
+
+Mỗi dòng của `GET /sach` (có hoặc không có `tuKhoa`) có thêm `id` (chuỗi, = `sach.id`) để FE gọi `GET|PATCH|DELETE /sach/:id` và `/sach/:id/ban-sach`. View `vw_tra_cuu_sach` không đổi; service gắn `id` theo `ma_sach`. Không phá hợp đồng cũ.

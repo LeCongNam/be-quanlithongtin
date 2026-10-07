@@ -6188,6 +6188,12 @@
       "TraCuuSachDto": {
         "type": "object",
         "properties": {
+          "id": {
+            "type": "string",
+            "example": "1",
+            "description": "sach.id, dùng cho /sach/{id}",
+            "nullable": false
+          },
           "ma_sach": {
             "type": "string",
             "example": "S001"
@@ -6224,6 +6230,7 @@
           }
         },
         "required": [
+          "id",
           "ma_sach",
           "isbn",
           "ten_sach",

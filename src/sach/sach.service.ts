@@ -35,10 +35,12 @@ export class SachService {
       const rows = await this.prisma.$queryRaw<
         Record<string, unknown>[]
       >`CALL sp_tra_cuu_sach(${q.tuKhoa}, ${user.maNguoiDung})`;
-      const data = namedRows(rows, TRA_CUU_SACH_COLUMNS, [
-        'nam_xuat_ban',
-        'so_ban_san_sang',
-      ]);
+      const data = await this.kemId(
+        namedRows(rows, TRA_CUU_SACH_COLUMNS, [
+          'nam_xuat_ban',
+          'so_ban_san_sang',
+        ]),
+      );
       return { data, total: data.length, page: 1, limit: data.length };
     }
     const { skip, take } = skipTake(q);
@@ -50,7 +52,19 @@ export class SachService {
         { total: bigint }[]
       >`SELECT COUNT(*) AS total FROM vw_tra_cuu_sach`,
     ]);
-    return paginate(numberColumns(rows, ['so_ban_san_sang']), Number(total), q);
+    const data = await this.kemId(numberColumns(rows, ['so_ban_san_sang']));
+    return paginate(data, Number(total), q);
+  }
+
+  /** `vw_tra_cuu_sach` không có id; gắn `sach.id` theo `ma_sach` để FE gọi được /sach/{id}. */
+  private async kemId<T extends Record<string, unknown>>(rows: T[]) {
+    if (!rows.length) return [];
+    const ids = await this.prisma.sach.findMany({
+      where: { maSach: { in: rows.map((r) => String(r.ma_sach)) } },
+      select: { id: true, maSach: true },
+    });
+    const idOf = new Map(ids.map((x) => [x.maSach, x.id.toString()]));
+    return rows.map((r) => ({ ...r, id: idOf.get(String(r.ma_sach)) ?? '' }));
   }
 
   async findOne(id: bigint) {

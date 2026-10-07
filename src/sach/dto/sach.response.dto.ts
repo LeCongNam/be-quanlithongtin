@@ -13,6 +13,8 @@ import {
 
 /** Một dòng của `vw_tra_cuu_sach` (GET /sach); cột giữ nguyên tên snake_case của view. */
 export class TraCuuSachDto {
+  @ApiBigInt('sach.id, dùng cho /sach/{id}')
+  id!: string;
   @ApiProperty({ example: 'S001' })
   ma_sach!: string;
   @ApiProperty({ nullable: true })
