@@ -21,7 +21,7 @@ export class DanhMucService {
   async listTheLoai(q: PageQueryDto) {
     const [data, total] = await Promise.all([
       this.prisma.theLoai.findMany({
-        orderBy: { tenTheLoai: 'asc' },
+        orderBy: [{ tenTheLoai: 'asc' }, { id: 'asc' }],
         ...skipTake(q),
       }),
       this.prisma.theLoai.count(),
@@ -48,7 +48,7 @@ export class DanhMucService {
   async listNhaXuatBan(q: PageQueryDto) {
     const [data, total] = await Promise.all([
       this.prisma.nhaXuatBan.findMany({
-        orderBy: { tenNxb: 'asc' },
+        orderBy: [{ tenNxb: 'asc' }, { id: 'asc' }],
         ...skipTake(q),
       }),
       this.prisma.nhaXuatBan.count(),
@@ -75,7 +75,7 @@ export class DanhMucService {
   async listTacGia(q: PageQueryDto) {
     const [data, total] = await Promise.all([
       this.prisma.tacGia.findMany({
-        orderBy: { tenTacGia: 'asc' },
+        orderBy: [{ tenTacGia: 'asc' }, { id: 'asc' }],
         ...skipTake(q),
       }),
       this.prisma.tacGia.count(),

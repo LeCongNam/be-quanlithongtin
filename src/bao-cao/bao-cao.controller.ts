@@ -55,7 +55,7 @@ export class BaoCaoController {
   async danhMucSach() {
     const rows = await this.prisma.$queryRaw<
       Row[]
-    >`SELECT * FROM vw_danh_muc_sach ORDER BY ten_sach`;
+    >`SELECT * FROM vw_danh_muc_sach ORDER BY ten_sach, ma_sach`;
     return numberColumns(rows, ['tong_so_ban', 'so_ban_san_sang']);
   }
 
@@ -68,7 +68,7 @@ export class BaoCaoController {
   async sachDangMuon() {
     const rows = await this.prisma.$queryRaw<
       Row[]
-    >`SELECT * FROM vw_sach_dang_muon ORDER BY han_tra`;
+    >`SELECT * FROM vw_sach_dang_muon ORDER BY han_tra, ma_phieu, ma_ban_sach`;
     return numberColumns(rows, ['so_ngay_qua_han']);
   }
 
@@ -81,7 +81,7 @@ export class BaoCaoController {
   async muonQuaHan() {
     const rows = await this.prisma.$queryRaw<
       Row[]
-    >`SELECT * FROM vw_muon_qua_han ORDER BY so_ngay_qua_han DESC`;
+    >`SELECT * FROM vw_muon_qua_han ORDER BY so_ngay_qua_han DESC, ma_phieu, ten_sach`;
     return numberColumns(rows, ['so_ngay_qua_han', 'tien_phat_tam_tinh']);
   }
 
@@ -89,13 +89,13 @@ export class BaoCaoController {
   @ApiOperation({
     summary: 'Báo cáo 4: người dùng vi phạm / phát sinh tiền phạt',
     description:
-      'View `vw_nguoi_dung_vi_pham`, gồm cả người đang giữ sách quá hạn chưa bị lập phiếu phạt.',
+      'View `vw_nguoi_dung_vi_pham`, gồm cả người đang giữ sách quá hạn chưa bị lập phiếu phạt. Sắp theo còn nợ giảm dần, rồi tiền phạt tạm tính giảm dần.',
   })
   @ApiOkResponse({ type: [NguoiDungViPhamDong] })
   async nguoiDungViPham() {
     const rows = await this.prisma.$queryRaw<
       Row[]
-    >`SELECT * FROM vw_nguoi_dung_vi_pham`;
+    >`SELECT * FROM vw_nguoi_dung_vi_pham ORDER BY con_no DESC, tien_phat_tam_tinh DESC, ma_nguoi_dung`;
     return numberColumns(rows, [
       'so_lan_phat',
       'tong_tien_phat',
@@ -115,7 +115,7 @@ export class BaoCaoController {
   async topSachMuonNhieu(@Query() { limit }: TopSachQueryDto) {
     const rows = await this.prisma.$queryRaw<
       Row[]
-    >`SELECT * FROM vw_top_sach_muon_nhieu ORDER BY so_luot_muon DESC LIMIT ${limit}`;
+    >`SELECT * FROM vw_top_sach_muon_nhieu ORDER BY so_luot_muon DESC, ma_sach LIMIT ${limit}`;
     return numberColumns(rows, ['so_luot_muon']);
   }
 

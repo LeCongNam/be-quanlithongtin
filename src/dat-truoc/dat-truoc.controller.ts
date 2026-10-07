@@ -53,7 +53,7 @@ export class DatTruocController {
   @ApiOperation({
     summary: 'Danh sách lượt đặt trước',
     description:
-      'Bạn đọc luôn chỉ thấy lượt của mình (bỏ qua `maNguoiDung`). Cán bộ thấy tất cả và lọc được theo `maNguoiDung`.',
+      'Bạn đọc luôn chỉ thấy lượt của mình (bỏ qua `maNguoiDung`). Cán bộ thấy tất cả và lọc được theo `maNguoiDung`. Lượt đang chờ (`CHO_XU_LY`, `SAN_SANG_NHAN`) đứng trước, rồi lượt đã đóng; mỗi nhóm sắp theo ngày đặt mới nhất trước.',
   })
   @ApiPaginatedResponse(DatTruocResponseDto)
   list(@Query() q: ListDatTruocQueryDto, @CurrentUser() user: AuthUser) {

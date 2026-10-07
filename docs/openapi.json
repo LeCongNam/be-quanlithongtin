@@ -3519,6 +3519,7 @@
         ]
       },
       "get": {
+        "description": "Sắp theo ngày mượn mới nhất trước, rồi `id` giảm dần.\n\n**Quyền:** `ADMIN`, `THU_THU`",
         "operationId": "MuonTra_list",
         "parameters": [
           {
@@ -3667,8 +3668,7 @@
         "x-roles": [
           "ADMIN",
           "THU_THU"
-        ],
-        "description": "**Quyền:** `ADMIN`, `THU_THU`"
+        ]
       }
     },
     "/phieu-muon/{maPhieu}": {
@@ -4107,7 +4107,7 @@
         ]
       },
       "get": {
-        "description": "Bạn đọc luôn chỉ thấy lượt của mình (bỏ qua `maNguoiDung`). Cán bộ thấy tất cả và lọc được theo `maNguoiDung`.\n\n**Quyền:** mọi tài khoản đã đăng nhập.",
+        "description": "Bạn đọc luôn chỉ thấy lượt của mình (bỏ qua `maNguoiDung`). Cán bộ thấy tất cả và lọc được theo `maNguoiDung`. Lượt đang chờ (`CHO_XU_LY`, `SAN_SANG_NHAN`) đứng trước, rồi lượt đã đóng; mỗi nhóm sắp theo ngày đặt mới nhất trước.\n\n**Quyền:** mọi tài khoản đã đăng nhập.",
         "operationId": "DatTruoc_list",
         "parameters": [
           {
@@ -4335,7 +4335,7 @@
     },
     "/phat": {
       "get": {
-        "description": "Phiếu phạt do DB tự lập khi trả sách quá hạn/hư hỏng/mất. Bạn đọc xem phạt của mình ở `GET /me/tien-phat`.\n\n**Quyền:** `ADMIN`, `THU_THU`",
+        "description": "Phiếu phạt do DB tự lập khi trả sách quá hạn/hư hỏng/mất. Bạn đọc xem phạt của mình ở `GET /me/tien-phat`. Phiếu `CHUA_THANH_TOAN` đứng trước, rồi các phiếu còn lại; mỗi nhóm sắp theo ngày tạo mới nhất trước.\n\n**Quyền:** `ADMIN`, `THU_THU`",
         "operationId": "Phat_list",
         "parameters": [
           {
@@ -5043,7 +5043,7 @@
     },
     "/bao-cao/nguoi-dung-vi-pham": {
       "get": {
-        "description": "View `vw_nguoi_dung_vi_pham`, gồm cả người đang giữ sách quá hạn chưa bị lập phiếu phạt.\n\n**Quyền:** `ADMIN`, `THU_THU`",
+        "description": "View `vw_nguoi_dung_vi_pham`, gồm cả người đang giữ sách quá hạn chưa bị lập phiếu phạt. Sắp theo còn nợ giảm dần, rồi tiền phạt tạm tính giảm dần.\n\n**Quyền:** `ADMIN`, `THU_THU`",
         "operationId": "BaoCao_nguoiDungViPham",
         "parameters": [],
         "responses": {

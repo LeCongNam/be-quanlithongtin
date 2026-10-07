@@ -59,6 +59,7 @@ export class MuonTraController {
   @ApiOperation({
     summary:
       'Danh sách phiếu mượn (phân trang, lọc theo trạng thái/người mượn)',
+    description: 'Sắp theo ngày mượn mới nhất trước, rồi `id` giảm dần.',
   })
   @ApiPaginatedResponse(PhieuMuonChiTietDto)
   list(@Query() q: ListPhieuMuonQueryDto) {

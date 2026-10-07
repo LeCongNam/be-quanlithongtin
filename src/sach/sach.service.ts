@@ -47,7 +47,7 @@ export class SachService {
     const [rows, [{ total }]] = await Promise.all([
       this.prisma.$queryRaw<
         Record<string, unknown>[]
-      >`SELECT * FROM vw_tra_cuu_sach ORDER BY ten_sach LIMIT ${take} OFFSET ${skip}`,
+      >`SELECT * FROM vw_tra_cuu_sach ORDER BY ten_sach, ma_sach LIMIT ${take} OFFSET ${skip}`,
       this.prisma.$queryRaw<
         { total: bigint }[]
       >`SELECT COUNT(*) AS total FROM vw_tra_cuu_sach`,

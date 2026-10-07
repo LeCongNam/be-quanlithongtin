@@ -20,6 +20,7 @@ const PHIEU_INCLUDE = {
   nguoiDung: { select: { maNguoiDung: true, hoTen: true } },
   nhanVien: { select: { maNguoiDung: true, hoTen: true } },
   ctPhieuMuons: {
+    orderBy: { id: 'asc' },
     include: {
       banSach: {
         select: {
@@ -63,7 +64,8 @@ export class MuonTraService {
       this.prisma.phieuMuon.findMany({
         where,
         include: PHIEU_INCLUDE,
-        orderBy: { id: 'desc' },
+        // id không theo ngày nghiệp vụ (dữ liệu nhập bù/seed): xếp theo ngày mượn, id làm khóa phụ
+        orderBy: [{ ngayMuon: 'desc' }, { id: 'desc' }],
         ...skipTake(q),
       }),
       this.prisma.phieuMuon.count({ where }),

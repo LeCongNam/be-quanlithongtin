@@ -36,7 +36,7 @@ export class PhatController {
     summary:
       'Danh sách phiếu phạt (phân trang, lọc theo trạng thái/người dùng)',
     description:
-      'Phiếu phạt do DB tự lập khi trả sách quá hạn/hư hỏng/mất. Bạn đọc xem phạt của mình ở `GET /me/tien-phat`.',
+      'Phiếu phạt do DB tự lập khi trả sách quá hạn/hư hỏng/mất. Bạn đọc xem phạt của mình ở `GET /me/tien-phat`. Phiếu `CHUA_THANH_TOAN` đứng trước, rồi các phiếu còn lại; mỗi nhóm sắp theo ngày tạo mới nhất trước.',
   })
   @ApiPaginatedResponse(PhieuPhatChiTietDto)
   list(@Query() q: ListPhatQueryDto) {

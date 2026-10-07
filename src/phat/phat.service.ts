@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { paginate, skipTake } from '../common/dto/page-query.dto.js';
+import { TrangThaiPhieuPhat } from '../common/db-enums.js';
+import { pagePriorityFirst } from '../common/priority-page.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ListPhatQueryDto } from './dto/phat.dto.js';
 
@@ -20,6 +22,11 @@ const INCLUDE = {
   },
 } satisfies Prisma.PhieuPhatInclude;
 
+const MOI_NHAT_TRUOC = [
+  { ngayTao: 'desc' },
+  { id: 'desc' },
+] satisfies Prisma.PhieuPhatOrderByWithRelationInput[];
+
 @Injectable()
 export class PhatService {
   constructor(private readonly prisma: PrismaService) {}
@@ -31,15 +38,34 @@ export class PhatService {
         ? { phieuMuon: { nguoiDung: { maNguoiDung: q.maNguoiDung } } }
         : undefined,
     };
-    const [data, total] = await Promise.all([
-      this.prisma.phieuPhat.findMany({
-        where,
-        include: INCLUDE,
-        orderBy: { id: 'desc' },
-        ...skipTake(q),
-      }),
-      this.prisma.phieuPhat.count({ where }),
-    ]);
+    // Phiếu chưa thu là việc cần thao tác "Thu tiền": đứng trước dù là phiếu cũ
+    const chuaThu: Prisma.PhieuPhatWhereInput = {
+      AND: [where, { trangThai: TrangThaiPhieuPhat.CHUA_THANH_TOAN }],
+    };
+    const conLai: Prisma.PhieuPhatWhereInput = {
+      AND: [where, { trangThai: { not: TrangThaiPhieuPhat.CHUA_THANH_TOAN } }],
+    };
+    const { data, total } = await pagePriorityFirst({
+      ...skipTake(q),
+      countFirst: () => this.prisma.phieuPhat.count({ where: chuaThu }),
+      countRest: () => this.prisma.phieuPhat.count({ where: conLai }),
+      findFirst: (skip, take) =>
+        this.prisma.phieuPhat.findMany({
+          where: chuaThu,
+          include: INCLUDE,
+          orderBy: MOI_NHAT_TRUOC,
+          skip,
+          take,
+        }),
+      findRest: (skip, take) =>
+        this.prisma.phieuPhat.findMany({
+          where: conLai,
+          include: INCLUDE,
+          orderBy: MOI_NHAT_TRUOC,
+          skip,
+          take,
+        }),
+    });
     return paginate(data, total, q);
   }
 
