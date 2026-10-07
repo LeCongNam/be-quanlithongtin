@@ -1,17 +1,15 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
-import { createHash, timingSafeEqual } from 'node:crypto';
 import type { AuthUser } from '../common/decorators/current-user.decorator.js';
 import {
   TrangThaiNguoiDung,
   TrangThaiTaiKhoan,
   VaiTroTaiKhoan,
 } from '../common/db-enums.js';
+import { hashMatKhau, khopMatKhau } from '../common/password.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LoginDto } from './dto/login.dto.js';
-
-const BCRYPT_ROUNDS = 10;
 
 @Injectable()
 export class AuthService {
@@ -53,28 +51,22 @@ export class AuthService {
   }
 
   /**
-   * Mật khẩu mới băm bằng bcrypt. Tài khoản seed trong DB dùng SHA2(muoi + mat_khau);
-   * đăng nhập đúng bằng kiểu cũ thì băm lại sang bcrypt.
+   * Định dạng chuẩn là SHA2(muoi + mat_khau) như sp_dang_nhap (xem common/password.ts).
+   * Hash bcrypt chỉ còn là di sản của các phiên bản BE cũ: đăng nhập đúng thì ghi lại về SHA2
+   * để tài khoản đó dùng được ở tầng CSDL.
    */
   private async verifyPassword(
     matKhau: string,
     taiKhoan: { id: bigint; muoi: string; matKhauHash: string },
   ): Promise<boolean> {
-    if (taiKhoan.matKhauHash.startsWith('$2')) {
-      return bcrypt.compare(matKhau, taiKhoan.matKhauHash);
+    if (!taiKhoan.matKhauHash.startsWith('$2')) {
+      return khopMatKhau(taiKhoan.muoi, matKhau, taiKhoan.matKhauHash);
     }
 
-    const legacy = createHash('sha256')
-      .update(taiKhoan.muoi + matKhau)
-      .digest('hex');
-    const expected = Buffer.from(taiKhoan.matKhauHash.toLowerCase());
-    const actual = Buffer.from(legacy);
-    if (expected.length !== actual.length || !timingSafeEqual(expected, actual))
-      return false;
-
+    if (!(await bcrypt.compare(matKhau, taiKhoan.matKhauHash))) return false;
     await this.prisma.taiKhoan.update({
       where: { id: taiKhoan.id },
-      data: { matKhauHash: await bcrypt.hash(matKhau, BCRYPT_ROUNDS) },
+      data: { matKhauHash: hashMatKhau(taiKhoan.muoi, matKhau) },
     });
     return true;
   }

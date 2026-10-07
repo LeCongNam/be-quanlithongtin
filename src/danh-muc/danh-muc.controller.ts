@@ -23,7 +23,7 @@ import { CreateTacGiaDto, UpdateTacGiaDto } from './dto/tac-gia.dto.js';
 
 const STAFF = [VaiTroTaiKhoan.ADMIN, VaiTroTaiKhoan.THU_THU];
 
-/** Đọc: mọi người đã đăng nhập. Ghi: ADMIN/THU_THU. */
+/** Đọc: mọi người đã đăng nhập. Thêm/sửa: ADMIN/THU_THU. Xóa: chỉ ADMIN (r_qltv_thuthu không có DELETE các bảng này). */
 @ApiTags('danh-muc')
 @ApiBearerAuth()
 @Controller()
@@ -47,7 +47,7 @@ export class DanhMucController {
   ) {
     return this.service.updateTheLoai(id, dto);
   }
-  @Roles(...STAFF) @Delete('the-loai/:id') removeTheLoai(
+  @Roles(VaiTroTaiKhoan.ADMIN) @Delete('the-loai/:id') removeTheLoai(
     @Param('id', ParseBigIntPipe) id: bigint,
   ) {
     return this.service.removeTheLoai(id);
@@ -72,7 +72,7 @@ export class DanhMucController {
   ) {
     return this.service.updateNhaXuatBan(id, dto);
   }
-  @Roles(...STAFF) @Delete('nha-xuat-ban/:id') removeNhaXuatBan(
+  @Roles(VaiTroTaiKhoan.ADMIN) @Delete('nha-xuat-ban/:id') removeNhaXuatBan(
     @Param('id', ParseBigIntPipe) id: bigint,
   ) {
     return this.service.removeNhaXuatBan(id);
@@ -93,7 +93,7 @@ export class DanhMucController {
   ) {
     return this.service.updateTacGia(id, dto);
   }
-  @Roles(...STAFF) @Delete('tac-gia/:id') removeTacGia(
+  @Roles(VaiTroTaiKhoan.ADMIN) @Delete('tac-gia/:id') removeTacGia(
     @Param('id', ParseBigIntPipe) id: bigint,
   ) {
     return this.service.removeTacGia(id);

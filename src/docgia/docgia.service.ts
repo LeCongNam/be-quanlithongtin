@@ -5,8 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
+import { hashMatKhau } from '../common/password.js';
 import { paginate, skipTake } from '../common/dto/page-query.dto.js';
 import {
   LoaiNguoiDung,
@@ -147,12 +147,13 @@ export class DocgiaService {
         ? VaiTroTaiKhoan.THU_THU
         : VaiTroTaiKhoan.BAN_DOC);
 
+    const muoi = randomBytes(16).toString('hex');
     return this.prisma.taiKhoan.create({
       data: {
         nguoiDungId: id,
         tenDangNhap: dto.tenDangNhap ?? nguoiDung.maNguoiDung.toLowerCase(),
-        muoi: randomBytes(16).toString('hex'),
-        matKhauHash: await bcrypt.hash(dto.matKhau, 10),
+        muoi,
+        matKhauHash: hashMatKhau(muoi, dto.matKhau),
         vaiTro,
         trangThai: TrangThaiTaiKhoan.HOAT_DONG,
       },

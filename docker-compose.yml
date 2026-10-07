@@ -12,14 +12,15 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: qltv_nhom8
-      MYSQL_USER: qltt
-      MYSQL_PASSWORD: qltt_password
+      # Không dùng MYSQL_USER/MYSQL_PASSWORD: entrypoint sẽ cấp ALL PRIVILEGES cho user đó.
+      # User qltt của BE (quyền tối thiểu) do docker/02_service_user.sql tạo.
     ports:
       - "3306:3306"
     volumes:
       # Schema chuẩn (00..08): bảng, seed, function, procedure, trigger, cursor/event, view, role.
       # Chỉ chạy lần đầu khi volume rỗng; muốn nạp lại: docker compose down -v
       - ./sql/99_full_setup.sql:/docker-entrypoint-initdb.d/01_full_setup.sql:ro
+      - ./docker/02_service_user.sql:/docker-entrypoint-initdb.d/02_service_user.sql:ro
       - mysql_data:/var/lib/mysql
 
 volumes:

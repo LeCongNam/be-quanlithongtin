@@ -20,7 +20,7 @@ export class CreateTaiKhoanDto {
 
   @IsString()
   @MinLength(8)
-  @MaxLength(72) // giới hạn của bcrypt
+  @MaxLength(72)
   matKhau!: string;
 
   /** Mặc định: CAN_BO -> THU_THU, SINH_VIEN/GIANG_VIEN -> BAN_DOC. DB (trigger) bắt buộc vai trò khớp loại người dùng. */
