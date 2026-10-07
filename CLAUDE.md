@@ -62,24 +62,10 @@ Both `package-lock.json` and `yarn.lock` exist; `package.json` scripts and READM
 ### Branch / worktree naming
 
 Always branch (and create any worktree) off `main` when starting a
-task. This is a team project, so the branch name is
-`<author>/<type>/<feature>`:
+task, This is a team project, so the branch name is
+`<author>`:
 
-- `<author>`: the developer's name, lowercase, no diacritics, no spaces. Use enough of the
-  name to be unique in the team (there are two people called "Minh", so use the full
-  given-name pair, not just "minh").
-- `<type>`: the task-type prefix from the table below, without its trailing slash.
-- `<feature>`: short kebab-case description of the work.
-
-Example: Trọng Minh adding a feature -> `trongminh/feat/be-foundation-modules` Task types:
-
-| Task type                    | Prefix      |
-| ---------------------------- | ----------- |
-| Bug fix                      | `fix/`      |
-| Enhancement                  | `enhancer/` |
-| New feature                  | `feat/`     |
-| Improvement                  | `improve/`  |
-| Hotfix (production incident) | `hotfix/`   |
+Example: Trọng Minh adding a feature -> `trongminh`
 
 ### Commit messages
 
