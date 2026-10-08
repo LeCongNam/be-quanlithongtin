@@ -5,14 +5,14 @@
 
 -- 1. DANH MỤC CƠ BẢN
 CREATE TABLE IF NOT EXISTS the_loai (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     ma_the_loai VARCHAR(20) NOT NULL UNIQUE,
     ten_the_loai VARCHAR(120) NOT NULL,
     mo_ta VARCHAR(255)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS nha_xuat_ban (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     ma_nxb VARCHAR(20) NOT NULL UNIQUE,
     ten_nxb VARCHAR(160) NOT NULL,
     dia_chi VARCHAR(255),
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS nha_xuat_ban (
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS tac_gia (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     ma_tac_gia VARCHAR(20) NOT NULL UNIQUE,
     ten_tac_gia VARCHAR(160) NOT NULL,
     quoc_tich VARCHAR(80),
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS tac_gia (
 
 -- 2. NGƯỜI DÙNG VÀ TÀI KHOẢN
 CREATE TABLE IF NOT EXISTS nguoi_dung (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     ma_nguoi_dung VARCHAR(20) NOT NULL UNIQUE,
     ho_ten VARCHAR(160) NOT NULL,
     loai_nguoi_dung VARCHAR(20) NOT NULL,
@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS nguoi_dung (
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS tai_khoan (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    nguoi_dung_id BIGINT NOT NULL UNIQUE,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nguoi_dung_id INT NOT NULL UNIQUE,
     ten_dang_nhap VARCHAR(80) NOT NULL UNIQUE,
     mat_khau_hash VARCHAR(255) NOT NULL,
     vai_tro VARCHAR(20) NOT NULL,
@@ -58,12 +58,12 @@ CREATE TABLE IF NOT EXISTS tai_khoan (
 
 -- 3. QUẢN LÝ SÁCH VÀ BẢN SÁCH
 CREATE TABLE IF NOT EXISTS sach (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     ma_sach VARCHAR(20) NOT NULL UNIQUE,
     isbn VARCHAR(20) UNIQUE,
     ten_sach VARCHAR(255) NOT NULL,
-    the_loai_id BIGINT NOT NULL,
-    nxb_id BIGINT NOT NULL,
+    the_loai_id INT NOT NULL,
+    nxb_id INT NOT NULL,
     nam_xuat_ban SMALLINT,
     ngon_ngu VARCHAR(50) DEFAULT 'Tieng Viet',
     mo_ta TEXT,
@@ -72,17 +72,17 @@ CREATE TABLE IF NOT EXISTS sach (
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS sach_tac_gia (
-    sach_id BIGINT NOT NULL,
-    tac_gia_id BIGINT NOT NULL,
+    sach_id INT NOT NULL,
+    tac_gia_id INT NOT NULL,
     PRIMARY KEY (sach_id, tac_gia_id),
     CONSTRAINT fk_stg_sach FOREIGN KEY (sach_id) REFERENCES sach(id),
     CONSTRAINT fk_stg_tac_gia FOREIGN KEY (tac_gia_id) REFERENCES tac_gia(id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS ban_sach (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     ma_ban_sach VARCHAR(30) NOT NULL UNIQUE,
-    sach_id BIGINT NOT NULL,
+    sach_id INT NOT NULL,
     vi_tri_ke VARCHAR(50) NOT NULL,
     ngay_nhap DATE NOT NULL,
     tinh_trang VARCHAR(20) NOT NULL DEFAULT 'SAN_SANG',
@@ -92,10 +92,10 @@ CREATE TABLE IF NOT EXISTS ban_sach (
 
 -- 4. QUẢN LÝ MƯỢN TRẢ VÀ PHẠT
 CREATE TABLE IF NOT EXISTS phieu_muon (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     ma_phieu VARCHAR(20) UNIQUE,
-    nguoi_dung_id BIGINT NOT NULL,
-    nhan_vien_id BIGINT,
+    nguoi_dung_id INT NOT NULL,
+    nhan_vien_id INT,
     ngay_muon DATE NOT NULL DEFAULT (CURRENT_DATE),
     trang_thai VARCHAR(20) NOT NULL DEFAULT 'DANG_MUON',
     CONSTRAINT fk_pm_nguoi_dung FOREIGN KEY (nguoi_dung_id) REFERENCES nguoi_dung(id),
@@ -104,9 +104,9 @@ CREATE TABLE IF NOT EXISTS phieu_muon (
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS ct_phieu_muon (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    phieu_muon_id BIGINT NOT NULL,
-    ban_sach_id BIGINT NOT NULL,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    phieu_muon_id INT NOT NULL,
+    ban_sach_id INT NOT NULL,
     han_tra DATE NOT NULL,
     ngay_tra DATE,
     so_lan_gia_han TINYINT NOT NULL DEFAULT 0,
@@ -119,8 +119,8 @@ CREATE TABLE IF NOT EXISTS ct_phieu_muon (
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS phieu_phat (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    ct_phieu_muon_id BIGINT NOT NULL,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ct_phieu_muon_id INT NOT NULL,
     loai_phat VARCHAR(20) NOT NULL,
     so_tien DECIMAL(12,2) NOT NULL,
     ly_do VARCHAR(255),
@@ -135,9 +135,9 @@ CREATE TABLE IF NOT EXISTS phieu_phat (
 
 -- 5. ĐẶT TRƯỚC VÀ NHẬT KÝ
 CREATE TABLE IF NOT EXISTS dat_truoc (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    nguoi_dung_id BIGINT NOT NULL,
-    sach_id BIGINT NOT NULL,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nguoi_dung_id INT NOT NULL,
+    sach_id INT NOT NULL,
     ngay_dat DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     han_giu DATETIME,
     trang_thai VARCHAR(20) NOT NULL DEFAULT 'CHO_XU_LY',
@@ -147,11 +147,11 @@ CREATE TABLE IF NOT EXISTS dat_truoc (
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS nhat_ky_hanh_vi (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    nguoi_dung_id BIGINT,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nguoi_dung_id INT,
     loai_hanh_vi VARCHAR(30) NOT NULL,
     doi_tuong VARCHAR(50),
-    doi_tuong_id BIGINT,
+    doi_tuong_id INT,
     mo_ta VARCHAR(255),
     thoi_gian DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_nkhv_nguoi_dung FOREIGN KEY (nguoi_dung_id) REFERENCES nguoi_dung(id)

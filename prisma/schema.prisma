@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 // ------------------------------------------------------
@@ -78,10 +79,10 @@ enum TrangThaiDatTruoc {
 // ------------------------------------------------------
 
 model TheLoai {
-  id         BigInt  @id @default(autoincrement())
-  maTheLoai  String  @unique @map("ma_the_loai") @db.VarChar(20)
-  tenTheLoai String  @map("ten_the_loai") @db.VarChar(120)
-  moTa       String? @map("mo_ta") @db.VarChar(255)
+  id           Int     @id @default(autoincrement())
+  ma_the_loai  String  @unique @db.VarChar(20)
+  ten_the_loai String  @db.VarChar(120)
+  mo_ta        String? @db.VarChar(255)
 
   sachs Sach[]
 
@@ -89,12 +90,12 @@ model TheLoai {
 }
 
 model NhaXuatBan {
-  id     BigInt  @id @default(autoincrement())
-  maNxb  String  @unique @map("ma_nxb") @db.VarChar(20)
-  tenNxb String  @map("ten_nxb") @db.VarChar(160)
-  diaChi String? @map("dia_chi") @db.VarChar(255)
-  email  String? @db.VarChar(120)
-  sdt    String? @db.VarChar(20)
+  id      Int     @id @default(autoincrement())
+  ma_nxb  String  @unique @db.VarChar(20)
+  ten_nxb String  @db.VarChar(160)
+  dia_chi String? @db.VarChar(255)
+  email   String? @db.VarChar(120)
+  sdt     String? @db.VarChar(20)
 
   sachs Sach[]
 
@@ -102,174 +103,174 @@ model NhaXuatBan {
 }
 
 model TacGia {
-  id        BigInt  @id @default(autoincrement())
-  maTacGia  String  @unique @map("ma_tac_gia") @db.VarChar(20)
-  tenTacGia String  @map("ten_tac_gia") @db.VarChar(160)
-  quocTich  String? @map("quoc_tich") @db.VarChar(80)
-  namSinh   Int?    @map("nam_sinh") @db.SmallInt
+  id          BigInt  @id @default(autoincrement())
+  ma_tac_gia  String  @unique @db.VarChar(20)
+  ten_tac_gia String  @db.VarChar(160)
+  quoc_tich   String? @db.VarChar(80)
+  nam_sinh    Int?    @db.SmallInt
 
-  sachTacGias SachTacGia[]
+  sach_tac_gias SachTacGia[]
 
   @@map("tac_gia")
 }
 
 model NguoiDung {
-  id            BigInt             @id @default(autoincrement())
-  maNguoiDung   String             @unique @map("ma_nguoi_dung") @db.VarChar(20)
-  hoTen         String             @map("ho_ten") @db.VarChar(160)
-  loaiNguoiDung LoaiNguoiDung      @map("loai_nguoi_dung")
-  email         String?            @unique @db.VarChar(120)
-  sdt           String?            @db.VarChar(20)
-  khoaDonVi     String?            @map("khoa_don_vi") @db.VarChar(160)
-  trangThai     TrangThaiNguoiDung @default(HOAT_DONG) @map("trang_thai")
-  createdAt     DateTime           @default(now()) @map("created_at")
+  id              Int                @id @default(autoincrement())
+  ma_nguoi_dung   String             @unique @db.VarChar(20)
+  ho_ten          String             @db.VarChar(160)
+  loai_nguoi_dung LoaiNguoiDung
+  email           String?            @unique @db.VarChar(120)
+  sdt             String?            @db.VarChar(20)
+  khoa_don_vi     String?            @db.VarChar(160)
+  trang_thai      TrangThaiNguoiDung @default(HOAT_DONG)
+  created_at      DateTime           @default(now())
 
-  taiKhoan         TaiKhoan?
-  phieuMuons       PhieuMuon[]    @relation("NguoiMuon")
-  phieuMuonCapNhat PhieuMuon[]    @relation("NhanVienXuly")
-  datTruocs        DatTruoc[]
-  nhatKyHanhVis    NhatKyHanhVi[]
+  tai_khoan           TaiKhoan?
+  phieu_muons         PhieuMuon[]    @relation("NguoiMuon")
+  phieu_muon_cap_nhat PhieuMuon[]    @relation("NhanVienXuly")
+  dat_truocs          DatTruoc[]
+  nhat_ky_hanh_vis    NhatKyHanhVi[]
 
   @@map("nguoi_dung")
 }
 
 model TaiKhoan {
-  id          BigInt            @id @default(autoincrement())
-  nguoiDungId BigInt            @unique @map("nguoi_dung_id")
-  tenDangNhap String            @unique @map("ten_dang_nhap") @db.VarChar(80)
-  matKhauHash String            @map("mat_khau_hash") @db.VarChar(255)
-  vaiTro      VaiTroTaiKhoan    @map("vai_tro")
-  trangThai   TrangThaiTaiKhoan @default(HOAT_DONG) @map("trang_thai")
-  createdAt   DateTime          @default(now()) @map("created_at")
+  id            Int               @id @default(autoincrement())
+  nguoi_dung_id Int               @unique
+  ten_dang_nhap String            @unique @db.VarChar(80)
+  mat_khau_hash String            @db.VarChar(255)
+  vai_tro       VaiTroTaiKhoan
+  trang_thai    TrangThaiTaiKhoan @default(HOAT_DONG)
+  created_at    DateTime          @default(now())
 
-  nguoiDung NguoiDung @relation(fields: [nguoiDungId], references: [id])
+  nguoi_dung NguoiDung @relation(fields: [nguoi_dung_id], references: [id])
 
   @@map("tai_khoan")
 }
 
 model Sach {
-  id         BigInt  @id @default(autoincrement())
-  maSach     String  @unique @map("ma_sach") @db.VarChar(20)
-  isbn       String? @unique @db.VarChar(20)
-  tenSach    String  @map("ten_sach") @db.VarChar(255)
-  theLoaiId  BigInt  @map("the_loai_id")
-  nxbId      BigInt  @map("nxb_id")
-  namXuatBan Int?    @map("nam_xuat_ban") @db.SmallInt
-  ngonNgu    String? @default("Tieng Viet") @map("ngon_ngu") @db.VarChar(50)
-  moTa       String? @map("mo_ta") @db.Text
+  id           Int     @id @default(autoincrement())
+  ma_sach      String  @unique @db.VarChar(20)
+  isbn         String? @unique @db.VarChar(20)
+  ten_sach     String  @db.VarChar(255)
+  the_loai_id  Int
+  nxb_id       Int
+  nam_xuat_ban Int?    @db.SmallInt
+  ngon_ngu     String? @default("Tieng Viet") @db.VarChar(50)
+  mo_ta        String? @db.Text
 
-  theLoai    TheLoai    @relation(fields: [theLoaiId], references: [id])
-  nhaXuatBan NhaXuatBan @relation(fields: [nxbId], references: [id])
+  the_loai     TheLoai    @relation(fields: [the_loai_id], references: [id])
+  nha_xuat_ban NhaXuatBan @relation(fields: [nxb_id], references: [id])
 
-  sachTacGias SachTacGia[]
-  banSachs    BanSach[]
-  datTruocs   DatTruoc[]
+  sach_tac_gias SachTacGia[]
+  ban_sachs     BanSach[]
+  dat_truocs    DatTruoc[]
 
-  @@index([tenSach], map: "idx_sach_ten")
+  @@index([ten_sach], map: "idx_sach_ten")
   @@map("sach")
 }
 
 model SachTacGia {
-  sachId   BigInt @map("sach_id")
-  tacGiaId BigInt @map("tac_gia_id")
+  sach_id    Int
+  tac_gia_id BigInt
 
-  sach   Sach   @relation(fields: [sachId], references: [id])
-  tacGia TacGia @relation(fields: [tacGiaId], references: [id])
+  sach    Sach   @relation(fields: [sach_id], references: [id])
+  tac_gia TacGia @relation(fields: [tac_gia_id], references: [id])
 
-  @@id([sachId, tacGiaId])
+  @@id([sach_id, tac_gia_id])
   @@map("sach_tac_gia")
 }
 
 model BanSach {
-  id        BigInt           @id @default(autoincrement())
-  maBanSach String           @unique @map("ma_ban_sach") @db.VarChar(30)
-  sachId    BigInt           @map("sach_id")
-  viTriKe   String           @map("vi_tri_ke") @db.VarChar(50)
-  ngayNhap  DateTime         @map("ngay_nhap") @db.Date
-  tinhTrang TinhTrangBanSach @default(SAN_SANG) @map("tinh_trang")
+  id          BigInt           @id @default(autoincrement())
+  ma_ban_sach String           @unique @db.VarChar(30)
+  sach_id     Int
+  vi_tri_ke   String           @db.VarChar(50)
+  ngay_nhap   DateTime         @db.Date
+  tinh_trang  TinhTrangBanSach @default(SAN_SANG)
 
-  sach         Sach          @relation(fields: [sachId], references: [id])
-  ctPhieuMuons CtPhieuMuon[]
+  sach           Sach          @relation(fields: [sach_id], references: [id])
+  ct_phieu_muons CtPhieuMuon[]
 
-  @@index([tinhTrang], map: "idx_bs_tinh_trang")
+  @@index([tinh_trang], map: "idx_bs_tinh_trang")
   @@map("ban_sach")
 }
 
 model PhieuMuon {
-  id          BigInt             @id @default(autoincrement())
-  maPhieu     String?            @unique @map("ma_phieu") @db.VarChar(20)
-  nguoiDungId BigInt             @map("nguoi_dung_id")
-  nhanVienId  BigInt?            @map("nhan_vien_id")
-  ngayMuon    DateTime           @default(now()) @map("ngay_muon") @db.Date
-  trangThai   TrangThaiPhieuMuon @default(DANG_MUON) @map("trang_thai")
+  id            BigInt             @id @default(autoincrement())
+  ma_phieu      String?            @unique @db.VarChar(20)
+  nguoi_dung_id Int
+  nhan_vien_id  Int?
+  ngay_muon     DateTime           @default(now()) @db.Date
+  trang_thai    TrangThaiPhieuMuon @default(DANG_MUON)
 
-  nguoiDung NguoiDung  @relation("NguoiMuon", fields: [nguoiDungId], references: [id])
-  nhanVien  NguoiDung? @relation("NhanVienXuly", fields: [nhanVienId], references: [id])
+  nguoi_dung NguoiDung  @relation("NguoiMuon", fields: [nguoi_dung_id], references: [id])
+  nhan_vien  NguoiDung? @relation("NhanVienXuly", fields: [nhan_vien_id], references: [id])
 
-  ctPhieuMuons CtPhieuMuon[]
+  ct_phieu_muons CtPhieuMuon[]
 
   @@map("phieu_muon")
 }
 
 model CtPhieuMuon {
-  id           BigInt        @id @default(autoincrement())
-  phieuMuonId  BigInt        @map("phieu_muon_id")
-  banSachId    BigInt        @map("ban_sach_id")
-  hanTra       DateTime      @map("han_tra") @db.Date
-  ngayTra      DateTime?     @map("ngay_tra") @db.Date
-  soLanGiaHan  Int           @default(0) @map("so_lan_gia_han") @db.TinyInt
-  tinhTrangTra TinhTrangTra? @map("tinh_trang_tra")
+  id             BigInt        @id @default(autoincrement())
+  phieu_muon_id  BigInt
+  ban_sach_id    BigInt
+  han_tra        DateTime      @db.Date
+  ngay_tra       DateTime?     @db.Date
+  so_lan_gia_han Int           @default(0) @db.TinyInt
+  tinh_trang_tra TinhTrangTra?
 
-  phieuMuon  PhieuMuon   @relation(fields: [phieuMuonId], references: [id])
-  banSach    BanSach     @relation(fields: [banSachId], references: [id])
-  phieuPhats PhieuPhat[]
+  phieu_muon  PhieuMuon   @relation(fields: [phieu_muon_id], references: [id])
+  ban_sach    BanSach     @relation(fields: [ban_sach_id], references: [id])
+  phieu_phats PhieuPhat[]
 
-  @@unique([phieuMuonId, banSachId], map: "uq_ctpm")
-  @@index([hanTra, ngayTra], map: "idx_ctpm_han_tra")
+  @@unique([phieu_muon_id, ban_sach_id], map: "uq_ctpm")
+  @@index([han_tra, ngay_tra], map: "idx_ctpm_han_tra")
   @@map("ct_phieu_muon")
 }
 
 model PhieuPhat {
-  id            BigInt             @id @default(autoincrement())
-  ctPhieuMuonId BigInt             @map("ct_phieu_muon_id")
-  loaiPhat      LoaiPhat           @map("loai_phat")
-  soTien        Decimal            @map("so_tien") @db.Decimal(12, 2)
-  lyDo          String?            @map("ly_do") @db.VarChar(255)
-  trangThai     TrangThaiPhieuPhat @default(CHUA_THANH_TOAN) @map("trang_thai")
-  ngayTao       DateTime           @default(now()) @map("ngay_tao") @db.Date
-  ngayThanhToan DateTime?          @map("ngay_thanh_toan") @db.Date
+  id               BigInt             @id @default(autoincrement())
+  ct_phieu_muon_id BigInt
+  loai_phat        LoaiPhat
+  so_tien          Decimal            @db.Decimal(12, 2)
+  ly_do            String?            @db.VarChar(255)
+  trang_thai       TrangThaiPhieuPhat @default(CHUA_THANH_TOAN)
+  ngay_tao         DateTime           @default(now()) @db.Date
+  ngay_thanh_toan  DateTime?          @db.Date
 
-  ctPhieuMuon CtPhieuMuon @relation(fields: [ctPhieuMuonId], references: [id])
+  ct_phieu_muon CtPhieuMuon @relation(fields: [ct_phieu_muon_id], references: [id])
 
-  @@index([trangThai], map: "idx_pp_trang_thai")
+  @@index([trang_thai], map: "idx_pp_trang_thai")
   @@map("phieu_phat")
 }
 
 model DatTruoc {
-  id          BigInt            @id @default(autoincrement())
-  nguoiDungId BigInt            @map("nguoi_dung_id")
-  sachId      BigInt            @map("sach_id")
-  ngayDat     DateTime          @default(now()) @map("ngay_dat")
-  hanGiu      DateTime?         @map("han_giu")
-  trangThai   TrangThaiDatTruoc @default(CHO_XU_LY) @map("trang_thai")
+  id            Int               @id @default(autoincrement())
+  nguoi_dung_id Int
+  sach_id       Int
+  ngay_dat      DateTime          @default(now())
+  han_giu       DateTime?
+  trang_thai    TrangThaiDatTruoc @default(CHO_XU_LY)
 
-  nguoiDung NguoiDung @relation(fields: [nguoiDungId], references: [id])
-  sach      Sach      @relation(fields: [sachId], references: [id])
+  nguoi_dung NguoiDung @relation(fields: [nguoi_dung_id], references: [id])
+  sach       Sach      @relation(fields: [sach_id], references: [id])
 
-  @@index([trangThai], map: "idx_dt_trang_thai")
+  @@index([trang_thai], map: "idx_dt_trang_thai")
   @@map("dat_truoc")
 }
 
 model NhatKyHanhVi {
-  id          BigInt   @id @default(autoincrement())
-  nguoiDungId BigInt?  @map("nguoi_dung_id")
-  loaiHanhVi  String   @map("loai_hanh_vi") @db.VarChar(30)
-  doiTuong    String?  @map("doi_tuong") @db.VarChar(50)
-  doiTuongId  BigInt?  @map("doi_tuong_id")
-  moTa        String?  @map("mo_ta") @db.VarChar(255)
-  thoiGian    DateTime @default(now()) @map("thoi_gian")
+  id            Int      @id @default(autoincrement())
+  nguoi_dung_id Int?
+  loai_hanh_vi  String   @db.VarChar(30)
+  doi_tuong     String?  @db.VarChar(50)
+  doi_tuong_id  Int?
+  mo_ta         String?  @db.VarChar(255)
+  thoi_gian     DateTime @default(now())
 
-  nguoiDung NguoiDung? @relation(fields: [nguoiDungId], references: [id])
+  nguoi_dung NguoiDung? @relation(fields: [nguoi_dung_id], references: [id])
 
   @@map("nhat_ky_hanh_vi")
 }
