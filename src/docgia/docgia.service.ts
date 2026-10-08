@@ -1,5 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
 import { CreateDocgiaDto } from './dto/create-docgia.dto.js';
 import { UpdateDocgiaDto } from './dto/update-docgia.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -8,24 +7,10 @@ import { PrismaService } from '../prisma/prisma.service.js';
 export class DocgiaService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(createDocgiaDto: CreateDocgiaDto) {
-   const docgia = await this.prisma.nguoiDung.create({
-        data: {
-          maNguoiDung: createDocgiaDto.maNguoiDung,
-          hoTen: createDocgiaDto.hoTen,
-          loaiNguoiDung: createDocgiaDto.loaiNguoiDung,
-          trangThai: createDocgiaDto.trangThai,
-          email: createDocgiaDto.email?.trim() || null,
-          sdt: createDocgiaDto.sdt?.trim() || null,
-          khoaDonVi: createDocgiaDto.khoaDonVi?.trim() || null,
-        },
-      });
-
-      return {
-        ...docgia, 
-        id: docgia.id.toString(),
-
-      };
+  async create(_createDocgiaDto: CreateDocgiaDto) {
+    return this.prisma.$queryRaw`
+      /* TODO */
+    `;
   }
 
   findAll() {
@@ -36,7 +21,7 @@ export class DocgiaService {
     return `This action returns a #${id} docgia`;
   }
 
-  update(id: number, updateDocgiaDto: UpdateDocgiaDto) {
+  update(id: number, _updateDocgiaDto: UpdateDocgiaDto) {
     return `This action updates a #${id} docgia`;
   }
 
