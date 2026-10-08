@@ -19,6 +19,7 @@ async function bootstrap() {
       .filter(Boolean),
   });
   setupSwagger(app);
-  await app.listen(process.env.PORT ?? 3000);
+  // Render chỉ dò cổng trên 0.0.0.0; listen không host sẽ bind IPv6 (::) và có thể bị báo "Timed Out".
+  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
 await bootstrap();
