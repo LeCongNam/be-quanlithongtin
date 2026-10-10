@@ -1,14 +1,14 @@
-import { namedRows } from './call-rows.js';
+import { numberColumns } from './call-rows.js';
 
-describe('namedRows', () => {
-  it('gán lại tên cột từ f0..fN và ép kiểu số cho cột chỉ định', () => {
-    const rows = [{ f0: 'S001', f1: '11', f2: null }];
-    expect(
-      namedRows(rows, ['ma_sach', 'so_ngay', 'ghi_chu'] as const, ['so_ngay']),
-    ).toEqual([{ ma_sach: 'S001', so_ngay: 11, ghi_chu: null }]);
+describe('numberColumns', () => {
+  it('ép chuỗi của cột chỉ định về number, giữ nguyên null và cột khác', () => {
+    const rows = [{ ma: 'S001', so_ngay: '11', tong: null, khoa: '7' }];
+    expect(numberColumns(rows, ['so_ngay', 'tong'])).toEqual([
+      { ma: 'S001', so_ngay: 11, tong: null, khoa: '7' },
+    ]);
   });
 
   it('trả mảng rỗng khi không có dòng', () => {
-    expect(namedRows([], ['a'] as const)).toEqual([]);
+    expect(numberColumns([], ['a'])).toEqual([]);
   });
 });

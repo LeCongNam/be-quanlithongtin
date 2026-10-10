@@ -2,7 +2,10 @@ services:
   db:
     image: mysql:8.0
     container_name: mysql_container
-    restart: always
+    # DB chạy local nên không tự bật lại khi mở Docker Desktop. Nếu để always, container cũ (mount đường dẫn cũ)
+    # tự chạy sau khi dời dự án và Docker tự tạo thư mục rác ở đường dẫn cũ.
+    # Dời/đổi tên thư mục dự án: docker compose down ở chỗ cũ trước, rồi docker compose up -d db ở chỗ mới.
+    restart: "no"
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci

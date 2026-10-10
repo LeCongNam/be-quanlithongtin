@@ -1,5 +1,4 @@
 // Giá trị các cột có CHECK constraint trong sql/01_schema.sql.
-// `prisma db pull` coi các cột này là String nên enum được giữ ở đây, không đặt trong schema.prisma.
 
 export enum LoaiNguoiDung {
   SINH_VIEN = 'SINH_VIEN',

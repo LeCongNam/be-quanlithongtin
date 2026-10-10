@@ -5,12 +5,13 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { Prisma } from '@prisma/client';
 import { STAFF_ROLES } from '../common/auth-helpers.js';
 import { numberColumns } from '../common/call-rows.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { ApiErrors } from '../common/swagger/api-errors.decorator.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { DbService } from '../database/db.service.js';
+import { sql, where } from '../database/sql.js';
+import type { SqlFragment } from '../database/sql.js';
 import {
   DatTruocQueryDto,
   NguoiDungQueryDto,
@@ -27,13 +28,6 @@ import {
   TopSachMuonNhieuDong,
 } from './dto/bao-cao.response.dto.js';
 
-type Row = Record<string, unknown>;
-
-const where = (conds: Prisma.Sql[]) =>
-  conds.length
-    ? Prisma.sql`WHERE ${Prisma.join(conds, ' AND ')}`
-    : Prisma.empty;
-
 /**
  * Báo cáo cho cán bộ, đọc từ các view vw_* trong DB (kết quả giữ nguyên tên cột snake_case của view;
  * cột đếm/tiền được ép về number). vw_tra_cuu_sach dùng ở GET /sach.
@@ -44,7 +38,7 @@ const where = (conds: Prisma.Sql[]) =>
 @Roles(...STAFF_ROLES)
 @Controller('bao-cao')
 export class BaoCaoController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly db: DbService) {}
 
   @Get('danh-muc-sach')
   @ApiOperation({
@@ -53,9 +47,9 @@ export class BaoCaoController {
   })
   @ApiOkResponse({ type: [DanhMucSachDong] })
   async danhMucSach() {
-    const rows = await this.prisma.$queryRaw<
-      Row[]
-    >`SELECT * FROM vw_danh_muc_sach ORDER BY ten_sach, ma_sach`;
+    const rows = await this.db.query(
+      sql`SELECT * FROM vw_danh_muc_sach ORDER BY ten_sach, ma_sach`,
+    );
     return numberColumns(rows, ['tong_so_ban', 'so_ban_san_sang']);
   }
 
@@ -66,9 +60,9 @@ export class BaoCaoController {
   })
   @ApiOkResponse({ type: [SachDangMuonDong] })
   async sachDangMuon() {
-    const rows = await this.prisma.$queryRaw<
-      Row[]
-    >`SELECT * FROM vw_sach_dang_muon ORDER BY han_tra, ma_phieu, ma_ban_sach`;
+    const rows = await this.db.query(
+      sql`SELECT * FROM vw_sach_dang_muon ORDER BY han_tra, ma_phieu, ma_ban_sach`,
+    );
     return numberColumns(rows, ['so_ngay_qua_han']);
   }
 
@@ -79,9 +73,9 @@ export class BaoCaoController {
   })
   @ApiOkResponse({ type: [MuonQuaHanDong] })
   async muonQuaHan() {
-    const rows = await this.prisma.$queryRaw<
-      Row[]
-    >`SELECT * FROM vw_muon_qua_han ORDER BY so_ngay_qua_han DESC, ma_phieu, ten_sach`;
+    const rows = await this.db.query(
+      sql`SELECT * FROM vw_muon_qua_han ORDER BY so_ngay_qua_han DESC, ma_phieu, ten_sach`,
+    );
     return numberColumns(rows, ['so_ngay_qua_han', 'tien_phat_tam_tinh']);
   }
 
@@ -93,9 +87,9 @@ export class BaoCaoController {
   })
   @ApiOkResponse({ type: [NguoiDungViPhamDong] })
   async nguoiDungViPham() {
-    const rows = await this.prisma.$queryRaw<
-      Row[]
-    >`SELECT * FROM vw_nguoi_dung_vi_pham ORDER BY con_no DESC, tien_phat_tam_tinh DESC, ma_nguoi_dung`;
+    const rows = await this.db.query(
+      sql`SELECT * FROM vw_nguoi_dung_vi_pham ORDER BY con_no DESC, tien_phat_tam_tinh DESC, ma_nguoi_dung`,
+    );
     return numberColumns(rows, [
       'so_lan_phat',
       'tong_tien_phat',
@@ -113,9 +107,9 @@ export class BaoCaoController {
   })
   @ApiOkResponse({ type: [TopSachMuonNhieuDong] })
   async topSachMuonNhieu(@Query() { limit }: TopSachQueryDto) {
-    const rows = await this.prisma.$queryRaw<
-      Row[]
-    >`SELECT * FROM vw_top_sach_muon_nhieu ORDER BY so_luot_muon DESC, ma_sach LIMIT ${limit}`;
+    const rows = await this.db.query(
+      sql`SELECT * FROM vw_top_sach_muon_nhieu ORDER BY so_luot_muon DESC, ma_sach LIMIT ${limit}`,
+    );
     return numberColumns(rows, ['so_luot_muon']);
   }
 
@@ -128,9 +122,9 @@ export class BaoCaoController {
   })
   @ApiOkResponse({ type: [ThongKeTienPhatDong] })
   async thongKeTienPhat() {
-    const rows = await this.prisma.$queryRaw<
-      Row[]
-    >`SELECT * FROM vw_thong_ke_tien_phat ORDER BY thang DESC, loai_phat`;
+    const rows = await this.db.query(
+      sql`SELECT * FROM vw_thong_ke_tien_phat ORDER BY thang DESC, loai_phat`,
+    );
     return numberColumns(rows, [
       'so_phieu',
       'tong_tien',
@@ -148,12 +142,10 @@ export class BaoCaoController {
   })
   @ApiOkResponse({ type: [LichSuMuonDong] })
   async lichSuMuon(@Query() { maNguoiDung }: NguoiDungQueryDto) {
-    const conds = maNguoiDung
-      ? [Prisma.sql`ma_nguoi_dung = ${maNguoiDung}`]
-      : [];
-    const rows = await this.prisma.$queryRaw<Row[]>`
+    const conds = maNguoiDung ? [sql`ma_nguoi_dung = ${maNguoiDung}`] : [];
+    const rows = await this.db.query(sql`
       SELECT * FROM vw_lich_su_muon ${where(conds)}
-      ORDER BY ngay_muon DESC, ma_phieu DESC, ma_ban_sach`;
+      ORDER BY ngay_muon DESC, ma_phieu DESC, ma_ban_sach`);
     return numberColumns(rows, ['so_lan_gia_han', 'so_ngay_qua_han']);
   }
 
@@ -166,12 +158,12 @@ export class BaoCaoController {
   })
   @ApiOkResponse({ type: [DatTruocDong] })
   async datTruoc(@Query() { maNguoiDung, trangThai }: DatTruocQueryDto) {
-    const conds: Prisma.Sql[] = [];
-    if (maNguoiDung) conds.push(Prisma.sql`ma_nguoi_dung = ${maNguoiDung}`);
-    if (trangThai) conds.push(Prisma.sql`trang_thai = ${trangThai}`);
-    const rows = await this.prisma.$queryRaw<Row[]>`
+    const conds: SqlFragment[] = [];
+    if (maNguoiDung) conds.push(sql`ma_nguoi_dung = ${maNguoiDung}`);
+    if (trangThai) conds.push(sql`trang_thai = ${trangThai}`);
+    const rows = await this.db.query(sql`
       SELECT * FROM vw_dat_truoc ${where(conds)}
-      ORDER BY ma_sach, trang_thai, thu_tu_cho, ngay_dat`;
+      ORDER BY ma_sach, trang_thai, thu_tu_cho, ngay_dat`);
     return numberColumns(rows, ['thu_tu_cho']);
   }
 }

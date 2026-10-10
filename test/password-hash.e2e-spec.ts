@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { AppModule } from '../src/app.module.js';
 import '../src/common/bigint-json.js';
-import { PrismaService } from '../src/prisma/prisma.service.js';
+import { DbService } from '../src/database/db.service.js';
 
 /**
  * Mật khẩu chỉ có MỘT định dạng: SHA2(muoi + mat_khau, 256), đúng như sp_dang_nhap (sql/04_procedures.sql).
@@ -20,18 +20,21 @@ const SHA2_HEX = /^[0-9a-f]{64}$/;
 describe('Băm mật khẩu thống nhất với sp_dang_nhap (e2e)', () => {
   let app: INestApplication;
   let http: ReturnType<typeof request>;
-  let prisma: PrismaService;
+  let db: DbService;
   let admin: string;
   const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
   /** Gọi thẳng sp_dang_nhap như user bạn đọc; trả token, hoặc null nếu CSDL từ chối. */
   const dangNhapCsdl = async (tenDangNhap: string, matKhau: string) => {
     try {
-      return await prisma.$transaction(async (tx) => {
-        await tx.$executeRaw`CALL sp_dang_nhap(${tenDangNhap}, ${matKhau}, @tok)`;
-        const [{ tok }] = await tx.$queryRaw<
-          { tok: string | null }[]
-        >`SELECT @tok AS tok`;
+      return await db.session(async (conn) => {
+        await conn.execute('CALL sp_dang_nhap(?, ?, @tok)', [
+          tenDangNhap,
+          matKhau,
+        ]);
+        const [{ tok }] = await conn.query<{ tok: string | null }>(
+          'SELECT @tok AS tok',
+        );
         return tok;
       });
     } catch {
@@ -40,8 +43,18 @@ describe('Băm mật khẩu thống nhất với sp_dang_nhap (e2e)', () => {
   };
 
   const hashTrongDb = async (tenDangNhap: string) =>
-    (await prisma.taiKhoan.findUniqueOrThrow({ where: { tenDangNhap } }))
-      .matKhauHash;
+    (
+      await db.query<{ mat_khau_hash: string }>(
+        'SELECT mat_khau_hash FROM tai_khoan WHERE ten_dang_nhap = ?',
+        [tenDangNhap],
+      )
+    )[0].mat_khau_hash;
+
+  const datHash = (tenDangNhap: string, hash: string) =>
+    db.executeOne(
+      'UPDATE tai_khoan SET mat_khau_hash = ? WHERE ten_dang_nhap = ?',
+      [hash, tenDangNhap],
+    );
 
   const dangNhapWeb = (tenDangNhap: string, matKhau: string) =>
     http.post('/auth/login').send({ tenDangNhap, matKhau });
@@ -74,7 +87,7 @@ describe('Băm mật khẩu thống nhất với sp_dang_nhap (e2e)', () => {
     );
     await app.init();
     http = request(app.getHttpServer());
-    prisma = app.get(PrismaService);
+    db = app.get(DbService);
     const res = await dangNhapWeb('ad001', 'AD001@Nhom8').expect(200);
     admin = res.body.accessToken;
   });
@@ -112,10 +125,7 @@ describe('Băm mật khẩu thống nhất với sp_dang_nhap (e2e)', () => {
 
   it('tài khoản đã bị đổi sang bcrypt: đăng nhập đúng một lần thì trở về SHA2', async () => {
     const user = await taoDocGia(`PC${sfx}`, PASSWORD);
-    await prisma.taiKhoan.update({
-      where: { tenDangNhap: user },
-      data: { matKhauHash: await bcrypt.hash(PASSWORD, 4) },
-    });
+    await datHash(user, await bcrypt.hash(PASSWORD, 4));
     expect(await dangNhapCsdl(user, PASSWORD)).toBeNull();
 
     await dangNhapWeb(user, PASSWORD).expect(200);
@@ -128,10 +138,7 @@ describe('Băm mật khẩu thống nhất với sp_dang_nhap (e2e)', () => {
     const sha = await taoDocGia(`PD${sfx}`, PASSWORD);
     const cu = await taoDocGia(`PE${sfx}`, PASSWORD);
     const hashCu = await bcrypt.hash(PASSWORD, 4);
-    await prisma.taiKhoan.update({
-      where: { tenDangNhap: cu },
-      data: { matKhauHash: hashCu },
-    });
+    await datHash(cu, hashCu);
     const hashSha = await hashTrongDb(sha);
 
     await dangNhapWeb(sha, 'sai-mat-khau').expect(401);

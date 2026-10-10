@@ -6,20 +6,19 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { numberColumns } from '../common/call-rows.js';
+import { sql } from '../database/sql.js';
 import {
   CurrentUser,
   type AuthUser,
 } from '../common/decorators/current-user.decorator.js';
 import { ApiErrors } from '../common/swagger/api-errors.decorator.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { DbService } from '../database/db.service.js';
 import {
   DatTruocCuaToiDto,
   LichSuMuonCuaToiDto,
   SachDangMuonCuaToiDto,
   TienPhatCuaToiDto,
 } from './dto/ban-doc.response.dto.js';
-
-type Row = Record<string, unknown>;
 
 /**
  * Khu vực "của tôi": luôn dùng mã người dùng trong token, không nhận tham số từ client.
@@ -31,7 +30,7 @@ type Row = Record<string, unknown>;
 @ApiErrors(401)
 @Controller('me')
 export class BanDocController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly db: DbService) {}
 
   /** = sp_bandoc_sach_dang_muon */
   @Get('sach-dang-muon')
@@ -42,11 +41,11 @@ export class BanDocController {
   })
   @ApiOkResponse({ type: [SachDangMuonCuaToiDto] })
   async sachDangMuon(@CurrentUser() user: AuthUser) {
-    const rows = await this.prisma.$queryRaw<Row[]>`
+    const rows = await this.db.query(sql`
       SELECT ma_phieu, ma_ban_sach, ma_sach, ten_sach, ngay_muon, han_tra, so_ngay_qua_han
       FROM vw_sach_dang_muon
       WHERE ma_nguoi_dung = ${user.maNguoiDung}
-      ORDER BY han_tra`;
+      ORDER BY han_tra`);
     return numberColumns(rows, ['so_ngay_qua_han']);
   }
 
@@ -59,14 +58,14 @@ export class BanDocController {
   })
   @ApiOkResponse({ type: [TienPhatCuaToiDto] })
   async tienPhat(@CurrentUser() user: AuthUser) {
-    const rows = await this.prisma.$queryRaw<Row[]>`
+    const rows = await this.db.query(sql`
       SELECT pp.id AS ma_phieu_phat, pp.loai_phat, pp.so_tien, pp.ly_do, pp.trang_thai, pp.ngay_tao, pp.ngay_thanh_toan
       FROM phieu_phat pp
       JOIN ct_phieu_muon c ON c.id = pp.ct_phieu_muon_id
       JOIN phieu_muon p ON p.id = c.phieu_muon_id
       JOIN nguoi_dung nd ON nd.id = p.nguoi_dung_id
       WHERE nd.ma_nguoi_dung = ${user.maNguoiDung}
-      ORDER BY pp.ngay_tao DESC, pp.id DESC`;
+      ORDER BY pp.ngay_tao DESC, pp.id DESC`);
     return numberColumns(rows, ['so_tien']);
   }
 
@@ -79,12 +78,12 @@ export class BanDocController {
   })
   @ApiOkResponse({ type: [LichSuMuonCuaToiDto] })
   async lichSuMuon(@CurrentUser() user: AuthUser) {
-    const rows = await this.prisma.$queryRaw<Row[]>`
+    const rows = await this.db.query(sql`
       SELECT ma_phieu, ma_ban_sach, ma_sach, ten_sach, ngay_muon, han_tra, ngay_tra, so_lan_gia_han, tinh_trang_tra,
              so_ngay_qua_han
       FROM vw_lich_su_muon
       WHERE ma_nguoi_dung = ${user.maNguoiDung}
-      ORDER BY ngay_muon DESC, ma_phieu DESC, ma_ban_sach`;
+      ORDER BY ngay_muon DESC, ma_phieu DESC, ma_ban_sach`);
     return numberColumns(rows, ['so_lan_gia_han', 'so_ngay_qua_han']);
   }
 
@@ -97,11 +96,11 @@ export class BanDocController {
   })
   @ApiOkResponse({ type: [DatTruocCuaToiDto] })
   async datTruoc(@CurrentUser() user: AuthUser) {
-    const rows = await this.prisma.$queryRaw<Row[]>`
+    const rows = await this.db.query(sql`
       SELECT ma_sach, ten_sach, ngay_dat, trang_thai, thu_tu_cho, ma_ban_sach, han_giu
       FROM vw_dat_truoc
       WHERE ma_nguoi_dung = ${user.maNguoiDung}
-      ORDER BY trang_thai IN ('CHO_XU_LY', 'SAN_SANG_NHAN') DESC, ngay_dat DESC`;
+      ORDER BY trang_thai IN ('CHO_XU_LY', 'SAN_SANG_NHAN') DESC, ngay_dat DESC`);
     return numberColumns(rows, ['thu_tu_cho']);
   }
 }

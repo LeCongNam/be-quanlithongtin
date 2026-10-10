@@ -6,15 +6,20 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { namedRows } from '../common/call-rows.js';
-import { DatabaseExceptionFilter } from '../common/filters/database-exception.filter.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import {
+  DbService,
+  type Row,
+  type SqlExecutor,
+  type TypeCast,
+} from '../database/db.service.js';
+import {
+  DatabaseError,
+  mapDbError,
+  RecordNotFoundError,
+} from '../database/db-error.js';
 import { DEMO_CATALOG, type MucDemo } from './demo.catalog.js';
 
 type Values = Record<string, string | number | null>;
-type Row = Record<string, unknown>;
-type Db = Pick<PrismaService, '$queryRawUnsafe' | '$executeRawUnsafe'>;
 
 export interface BangKetQua {
   nhan: string;
@@ -23,7 +28,24 @@ export interface BangKetQua {
 }
 
 const THAM_SO = /:([a-z_]+)\b/g;
-const dbFilter = new DatabaseExceptionFilter();
+
+/**
+ * Bảng demo hiển thị số là number (pool mặc định trả BIGINT/DECIMAL dạng chuỗi để JSON giống phần còn lại của API):
+ * BIGINT vượt giới hạn an toàn của number vẫn giữ chuỗi.
+ */
+const SO_THANH_NUMBER: TypeCast = (field, next) => {
+  if (
+    field.type === 'LONGLONG' ||
+    field.type === 'NEWDECIMAL' ||
+    field.type === 'DECIMAL'
+  ) {
+    const value = field.string();
+    if (value === null) return null;
+    const n = Number(value);
+    return field.type === 'LONGLONG' && !Number.isSafeInteger(n) ? value : n;
+  }
+  return next();
+};
 
 /** Thay `:ten` bằng `?` và trả danh sách giá trị theo thứ tự xuất hiện (bind an toàn, không nối chuỗi). */
 function bind(sql: string, values: Values) {
@@ -48,14 +70,10 @@ function hienThi(sql: string, values: Values) {
 }
 
 function chuanHoaGiaTri(value: unknown): unknown {
-  if (typeof value === 'bigint') {
-    return Number.isSafeInteger(Number(value)) ? Number(value) : String(value);
-  }
   if (value instanceof Date) {
     const s = value.toISOString().slice(0, 19).replace('T', ' ');
     return s.endsWith(' 00:00:00') ? s.slice(0, 10) : s;
   }
-  if (value instanceof Prisma.Decimal) return value.toNumber();
   return value;
 }
 
@@ -81,7 +99,7 @@ function thanhBang(nhan: string, rows: Row[], cot?: readonly string[]) {
 export class DemoService {
   private readonly logger = new Logger(DemoService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly db: DbService) {}
 
   list() {
     return DEMO_CATALOG.map((m) => ({
@@ -126,7 +144,7 @@ export class DemoService {
   async bang(id: string, thamSo: Record<string, string>) {
     const item = this.tim(id);
     const values = this.chuanHoa(item, thamSo);
-    return { bang: await this.docBang(this.prisma, item, values) };
+    return { bang: await this.docBang(this.db, item, values) };
   }
 
   /** Bước 4 và 5: chạy rồi đọc lại các bảng liên quan. */
@@ -135,40 +153,34 @@ export class DemoService {
     const values = this.chuanHoa(item, thamSo);
     const lenh = hienThi(item.lenh, values);
 
-    return this.prisma.$transaction(
-      async (tx) => {
-        // autocommit = 0: procedure chạy trong transaction này (không tự COMMIT) nên ROLLBACK hoàn tác được.
-        await tx.$executeRawUnsafe('SET autocommit = 0');
-        try {
-          let loi: string | null = null;
-          let soDongAnhHuong: number | null = null;
-          let ketQua: BangKetQua | null = null;
-          try {
-            const out = await this.thucThi(tx, item, values);
-            soDongAnhHuong = out.soDongAnhHuong;
-            ketQua = out.ketQua;
-          } catch (err) {
-            loi = this.thongBaoLoi(err);
-            await tx.$executeRawUnsafe('ROLLBACK');
-          }
-          const bangSau = await this.docBang(tx, item, values);
-          const daHoanTac = loi !== null || hoanTac;
-          await tx.$executeRawUnsafe(daHoanTac ? 'ROLLBACK' : 'COMMIT');
-          return {
-            lenh,
-            thanhCong: loi === null,
-            loi,
-            daHoanTac,
-            soDongAnhHuong,
-            ketQua,
-            bangSau,
-          };
-        } finally {
-          await tx.$executeRawUnsafe('SET autocommit = 1');
-        }
-      },
-      { timeout: 20000 },
-    );
+    // autocommit = 0: procedure chạy trong transaction của session này (không tự COMMIT) nên ROLLBACK hoàn tác được;
+    // `session` tự trả autocommit = 1 trước khi nhả connection về pool.
+    return this.db.session(async (conn) => {
+      await conn.execute('SET autocommit = 0');
+      let loi: string | null = null;
+      let soDongAnhHuong: number | null = null;
+      let ketQua: BangKetQua | null = null;
+      try {
+        const out = await this.thucThi(conn, item, values);
+        soDongAnhHuong = out.soDongAnhHuong;
+        ketQua = out.ketQua;
+      } catch (err) {
+        loi = this.thongBaoLoi(err);
+        await conn.execute('ROLLBACK');
+      }
+      const bangSau = await this.docBang(conn, item, values);
+      const daHoanTac = loi !== null || hoanTac;
+      await conn.execute(daHoanTac ? 'ROLLBACK' : 'COMMIT');
+      return {
+        lenh,
+        thanhCong: loi === null,
+        loi,
+        daHoanTac,
+        soDongAnhHuong,
+        ketQua,
+        bangSau,
+      };
+    });
   }
 
   private tim(id: string): MucDemo {
@@ -209,46 +221,52 @@ export class DemoService {
   }
 
   private async thucThi(
-    tx: Db,
+    conn: SqlExecutor,
     item: MucDemo,
     values: Values,
   ): Promise<{ soDongAnhHuong: number | null; ketQua: BangKetQua | null }> {
     const { text, args } = bind(item.lenh, values);
     switch (item.chay) {
       case 'CALL':
-        await tx.$executeRawUnsafe(text, ...args);
+        await conn.execute(text, args);
         return { soDongAnhHuong: null, ketQua: null };
       case 'DML': {
-        const n = await tx.$executeRawUnsafe(text, ...args);
-        return { soDongAnhHuong: n, ketQua: null };
+        const { affectedRows } = await conn.execute(text, args);
+        return { soDongAnhHuong: affectedRows, ketQua: null };
       }
       case 'CALL_KQ': {
-        const rows = await tx.$queryRawUnsafe<Row[]>(text, ...args);
-        const named = namedRows(rows, item.cot ?? [], item.cotSo ?? []);
+        // CALL trả [result set đầu, ..., header]; procedure không SELECT gì thì chỉ có header
+        const result: unknown = await conn.query(text, args, SO_THANH_NUMBER);
+        const rows = (
+          Array.isArray(result) && Array.isArray(result[0]) ? result[0] : []
+        ) as Row[];
         return {
           soDongAnhHuong: null,
-          ketQua: thanhBang('Kết quả trả về', named, item.cot),
+          ketQua: thanhBang('Kết quả trả về', rows, item.cot),
         };
       }
       case 'SELECT': {
-        const rows = await tx.$queryRawUnsafe<Row[]>(text, ...args);
-        return { soDongAnhHuong: null, ketQua: thanhBang('Kết quả trả về', rows) };
+        const rows = await conn.query(text, args, SO_THANH_NUMBER);
+        return {
+          soDongAnhHuong: null,
+          ketQua: thanhBang('Kết quả trả về', rows),
+        };
       }
     }
   }
 
-  private async docBang(db: Db, item: MucDemo, values: Values) {
+  private async docBang(db: SqlExecutor, item: MucDemo, values: Values) {
     const out: BangKetQua[] = [];
     for (const b of item.bang) {
       const { text, args } = bind(b.sql, values);
-      const rows = await db.$queryRawUnsafe<Row[]>(text, ...args);
+      const rows = await db.query(text, args, SO_THANH_NUMBER);
       out.push(thanhBang(b.nhan, rows));
     }
     return out;
   }
 
   private async docGoiY(sql: string) {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(sql);
+    const rows = await this.db.query(sql);
     return rows.map((r) => ({
       giaTri: String(chuanHoaGiaTri(r.gia_tri)),
       moTa: typeof r.mo_ta === 'string' ? r.mo_ta : null,
@@ -265,10 +283,9 @@ export class DemoService {
     if (!trigger) {
       const kind = ten.startsWith('fn_') ? 'FUNCTION' : 'PROCEDURE';
       try {
-        const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-          `SHOW CREATE ${kind} \`${ten}\``,
-        );
-        const sql = rows[0]?.[`Create ${kind === 'FUNCTION' ? 'Function' : 'Procedure'}`];
+        const rows = await this.db.query(`SHOW CREATE ${kind} \`${ten}\``);
+        const sql =
+          rows[0]?.[`Create ${kind === 'FUNCTION' ? 'Function' : 'Procedure'}`];
         if (typeof sql === 'string') {
           return {
             ten,
@@ -304,11 +321,8 @@ export class DemoService {
   }
 
   private thongBaoLoi(err: unknown) {
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError ||
-      err instanceof Prisma.PrismaClientUnknownRequestError
-    ) {
-      return dbFilter.map(err).message;
+    if (err instanceof DatabaseError || err instanceof RecordNotFoundError) {
+      return mapDbError(err).message;
     }
     this.logger.error(String(err));
     return 'Loi khong xac dinh';

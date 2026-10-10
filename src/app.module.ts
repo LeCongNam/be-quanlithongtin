@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
-import { PrismaModule } from './prisma/prisma.module.js';
+import { DatabaseModule } from './database/database.module.js';
 import { DocgiaModule } from './docgia/docgia.module.js';
 import { DanhMucModule } from './danh-muc/danh-muc.module.js';
 import { SachModule } from './sach/sach.module.js';
@@ -22,7 +22,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    PrismaModule,
+    DatabaseModule,
     AuthModule,
     DocgiaModule,
     DanhMucModule,

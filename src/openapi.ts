@@ -21,7 +21,7 @@ const DESCRIPTION = `API quản lý thư viện đại học (đồ án IE103, n
 - Khóa chính BIGINT (\`id\`) là **chuỗi**, ví dụ \`"13"\`. Các mã (\`maSach\`, \`maBanSach\`, \`maNguoiDung\`...) là chuỗi và là thứ dùng khi gọi API nghiệp vụ.
 - Endpoint danh sách có phân trang trả \`{ data, total, page, limit }\` (\`page\` từ 1, \`limit\` tối đa 100).
 - Cột ngày kiểu DATE trả dạng ISO \`YYYY-MM-DDT00:00:00.000Z\`.
-- Tiền (VND) từ báo cáo và \`/me\` là number; \`soTien\`/\`giaBia\` đọc từ bảng là chuỗi thập phân (Prisma Decimal).
+- Tiền (VND) từ báo cáo và \`/me\` là number; \`soTien\`/\`giaBia\` đọc từ bảng là chuỗi thập phân (DECIMAL).
 - Báo cáo (\`/bao-cao/*\`), \`GET /sach\` và \`/me/*\` giữ tên cột snake_case của view; các endpoint còn lại dùng camelCase.
 - Lỗi luôn có dạng \`{ statusCode, message }\`. 422 là lỗi nghiệp vụ do CSDL báo, \`message\` là thông báo cho người dùng (tiếng Việt không dấu).`;
 

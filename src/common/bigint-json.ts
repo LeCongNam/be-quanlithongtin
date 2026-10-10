@@ -1,4 +1,5 @@
-// Mọi khóa chính là BIGINT nên Prisma trả BigInt; JSON.stringify không tuần tự hóa được BigInt.
+// Khóa chính là BIGINT: dòng đọc từ CSDL đã là chuỗi, còn `bigint` (ParseBigIntPipe, insertId) nếu lọt vào JSON thì cũng thành chuỗi;
+// JSON.stringify mặc định không tuần tự hóa được BigInt.
 declare global {
   interface BigInt {
     toJSON(): string;

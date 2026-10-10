@@ -4,7 +4,6 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { hashMatKhau } from '../common/password.js';
 import { paginate, skipTake } from '../common/dto/page-query.dto.js';
@@ -15,81 +14,122 @@ import {
   VaiTroTaiKhoan,
 } from '../common/db-enums.js';
 import type { AuthUser } from '../common/decorators/current-user.decorator.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { DbService, type SqlExecutor } from '../database/db.service.js';
+import {
+  camelize,
+  camelizeAll,
+  insertInto,
+  updateTable,
+} from '../database/rows.js';
+import {
+  ESCAPE_LIKE,
+  likeContains,
+  raw,
+  sql,
+  where,
+  type SqlFragment,
+} from '../database/sql.js';
 import { CreateDocgiaDto } from './dto/create-docgia.dto.js';
 import { CreateTaiKhoanDto } from './dto/create-tai-khoan.dto.js';
 import { DOCGIA_SAP_XEP, ListDocgiaQueryDto } from './dto/docgia-query.dto.js';
 import { UpdateDocgiaDto } from './dto/update-docgia.dto.js';
 import { parseSapXep } from '../common/dto/sap-xep.js';
 
+const NGUOI_DUNG_COLUMNS = [
+  'maNguoiDung',
+  'hoTen',
+  'loaiNguoiDung',
+  'email',
+  'sdt',
+  'khoaDonVi',
+] as const;
+
+/** Field `sapXep` (whitelist ở DTO) -> cột của nguoi_dung. */
+const CUOT_SAP_XEP: Record<(typeof DOCGIA_SAP_XEP)[number], string> = {
+  maNguoiDung: 'ma_nguoi_dung',
+  hoTen: 'ho_ten',
+};
+
 // Không bao giờ trả mat_khau_hash / muoi ra ngoài.
-const TAI_KHOAN_PUBLIC = {
-  select: { tenDangNhap: true, vaiTro: true, trangThai: true },
-} as const;
+const TAI_KHOAN_PUBLIC = 'ten_dang_nhap, vai_tro, trang_thai';
 
 @Injectable()
 export class DocgiaService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly db: DbService) {}
 
   create(dto: CreateDocgiaDto) {
-    return this.prisma.nguoiDung.create({
-      data: {
-        maNguoiDung: dto.maNguoiDung,
-        hoTen: dto.hoTen,
-        loaiNguoiDung: dto.loaiNguoiDung,
-        email: dto.email?.trim() || null,
-        sdt: dto.sdt?.trim() || null,
-        khoaDonVi: dto.khoaDonVi?.trim() || null,
-      },
+    return this.db.transaction(async (tx) => {
+      const { insertId } = await tx.execute(
+        insertInto('nguoi_dung', NGUOI_DUNG_COLUMNS, {
+          maNguoiDung: dto.maNguoiDung,
+          hoTen: dto.hoTen,
+          loaiNguoiDung: dto.loaiNguoiDung,
+          email: dto.email?.trim() || null,
+          sdt: dto.sdt?.trim() || null,
+          khoaDonVi: dto.khoaDonVi?.trim() || null,
+        }),
+      );
+      return this.layNguoiDung(BigInt(insertId), tx);
     });
   }
 
   async findAll(q: ListDocgiaQueryDto) {
     const sx = parseSapXep<(typeof DOCGIA_SAP_XEP)[number]>(q.sapXep);
-    const where: Prisma.NguoiDungWhereInput = {
-      loaiNguoiDung: q.loaiNguoiDung,
-      trangThai: q.trangThai,
-      OR: q.tuKhoa
-        ? [
-            { maNguoiDung: { contains: q.tuKhoa } },
-            { hoTen: { contains: q.tuKhoa } },
-            { email: { contains: q.tuKhoa } },
-          ]
-        : undefined,
-    };
-    const [data, total] = await Promise.all([
-      this.prisma.nguoiDung.findMany({
-        where,
-        orderBy: sx
-          ? [{ [sx.field]: sx.dir }, { id: sx.dir }]
-          : { maNguoiDung: 'asc' },
-        ...skipTake(q),
-      }),
-      this.prisma.nguoiDung.count({ where }),
+    const conds: SqlFragment[] = [];
+    if (q.loaiNguoiDung) conds.push(sql`loai_nguoi_dung = ${q.loaiNguoiDung}`);
+    if (q.trangThai) conds.push(sql`trang_thai = ${q.trangThai}`);
+    if (q.tuKhoa) {
+      const mau = likeContains(q.tuKhoa);
+      conds.push(
+        sql`(ma_nguoi_dung LIKE ${mau} ${ESCAPE_LIKE} OR ho_ten LIKE ${mau} ${ESCAPE_LIKE} OR email LIKE ${mau} ${ESCAPE_LIKE})`,
+      );
+    }
+    const dir = sx?.dir === 'desc' ? 'DESC' : 'ASC';
+    const orderBy = sx
+      ? `${CUOT_SAP_XEP[sx.field]} ${dir}, id ${dir}`
+      : 'ma_nguoi_dung ASC';
+    const { skip, take } = skipTake(q);
+
+    const [rows, [count]] = await Promise.all([
+      this.db.query(
+        sql`SELECT * FROM nguoi_dung ${where(conds)} ORDER BY ${raw(orderBy)} LIMIT ${take} OFFSET ${skip}`,
+      ),
+      this.db.query<{ total: string }>(
+        sql`SELECT COUNT(*) AS total FROM nguoi_dung ${where(conds)}`,
+      ),
     ]);
-    return paginate(data, total, q);
+    return paginate(camelizeAll(rows), Number(count.total), q);
   }
 
   async findOne(id: bigint) {
-    const docgia = await this.prisma.nguoiDung.findUnique({
-      where: { id },
-      include: { taiKhoan: TAI_KHOAN_PUBLIC },
-    });
+    const docgia = await this.layNguoiDung(id);
     if (!docgia) throw new NotFoundException('Không tìm thấy người dùng');
-    return docgia;
+    const taiKhoan = await this.db.queryOne(
+      `SELECT ${TAI_KHOAN_PUBLIC} FROM tai_khoan WHERE nguoi_dung_id = ?`,
+      [id],
+    );
+    return { ...docgia, taiKhoan: taiKhoan ? camelize(taiKhoan) : null };
   }
 
   update(id: bigint, dto: UpdateDocgiaDto) {
-    return this.prisma.nguoiDung.update({
-      where: { id },
-      data: {
-        maNguoiDung: dto.maNguoiDung,
-        hoTen: dto.hoTen,
-        loaiNguoiDung: dto.loaiNguoiDung,
-        email: dto.email === undefined ? undefined : dto.email.trim() || null,
-        sdt: dto.sdt,
-        khoaDonVi: dto.khoaDonVi,
-      },
+    return this.db.transaction(async (tx) => {
+      await tx.executeOne(
+        updateTable(
+          'nguoi_dung',
+          NGUOI_DUNG_COLUMNS,
+          {
+            maNguoiDung: dto.maNguoiDung,
+            hoTen: dto.hoTen,
+            loaiNguoiDung: dto.loaiNguoiDung,
+            email:
+              dto.email === undefined ? undefined : dto.email.trim() || null,
+            sdt: dto.sdt,
+            khoaDonVi: dto.khoaDonVi,
+          },
+          sql`id = ${id}`,
+        ),
+      );
+      return this.layNguoiDung(id, tx);
     });
   }
 
@@ -106,14 +146,18 @@ export class DocgiaService {
     const nd = await this.findOne(id);
     if (nd.loaiNguoiDung === LoaiNguoiDung.CAN_BO) {
       if (user.vaiTro !== VaiTroTaiKhoan.ADMIN)
-        throw new ForbiddenException('Chỉ quản trị viên được đổi trạng thái cán bộ');
-      await this.prisma.nguoiDung.update({
-        where: { id },
-        data: { trangThai },
-      });
+        throw new ForbiddenException(
+          'Chỉ quản trị viên được đổi trạng thái cán bộ',
+        );
+      await this.db.executeOne(
+        'UPDATE nguoi_dung SET trang_thai = ? WHERE id = ?',
+        [trangThai, id],
+      );
     } else {
-      await this.prisma
-        .$executeRaw`CALL sp_doi_trang_thai_nguoi_dung(${nd.maNguoiDung}, ${trangThai})`;
+      await this.db.call('sp_doi_trang_thai_nguoi_dung', [
+        nd.maNguoiDung,
+        trangThai,
+      ]);
     }
     return this.findOne(id);
   }
@@ -125,25 +169,29 @@ export class DocgiaService {
 
   /** Chỉ quản trị. trg_tai_khoan_bu từ chối mở tài khoản khi người dùng chưa HOAT_DONG (422). */
   async doiTrangThaiTaiKhoan(id: bigint, trangThai: TrangThaiTaiKhoan) {
-    const taiKhoan = await this.prisma.taiKhoan.findUnique({
-      where: { nguoiDungId: id },
-    });
-    if (!taiKhoan) throw new NotFoundException('Người dùng chưa có tài khoản');
-    return this.prisma.taiKhoan.update({
-      where: { nguoiDungId: id },
-      data: { trangThai },
-      ...TAI_KHOAN_PUBLIC,
+    return this.db.transaction(async (tx) => {
+      const taiKhoan = await tx.queryOne(
+        'SELECT id FROM tai_khoan WHERE nguoi_dung_id = ?',
+        [id],
+      );
+      if (!taiKhoan)
+        throw new NotFoundException('Người dùng chưa có tài khoản');
+      await tx.executeOne(
+        'UPDATE tai_khoan SET trang_thai = ? WHERE nguoi_dung_id = ?',
+        [trangThai, id],
+      );
+      return this.layTaiKhoanPublic(id, tx);
     });
   }
 
   async taoTaiKhoan(id: bigint, dto: CreateTaiKhoanDto) {
-    const nguoiDung = await this.prisma.nguoiDung.findUnique({
-      where: { id },
-      include: { taiKhoan: true },
-    });
+    const nguoiDung = await this.layNguoiDung(id);
     if (!nguoiDung) throw new NotFoundException('Không tìm thấy người dùng');
-    if (nguoiDung.taiKhoan)
-      throw new ConflictException('Người dùng đã có tài khoản');
+    const daCo = await this.db.queryOne(
+      'SELECT id FROM tai_khoan WHERE nguoi_dung_id = ?',
+      [id],
+    );
+    if (daCo) throw new ConflictException('Người dùng đã có tài khoản');
 
     const vaiTro =
       dto.vaiTro ??
@@ -152,16 +200,44 @@ export class DocgiaService {
         : VaiTroTaiKhoan.BAN_DOC);
 
     const muoi = randomBytes(16).toString('hex');
-    return this.prisma.taiKhoan.create({
-      data: {
-        nguoiDungId: id,
-        tenDangNhap: dto.tenDangNhap ?? nguoiDung.maNguoiDung.toLowerCase(),
-        muoi,
-        matKhauHash: hashMatKhau(muoi, dto.matKhau),
-        vaiTro,
-        trangThai: TrangThaiTaiKhoan.HOAT_DONG,
-      },
-      ...TAI_KHOAN_PUBLIC,
+    return this.db.transaction(async (tx) => {
+      await tx.execute(
+        insertInto(
+          'tai_khoan',
+          [
+            'nguoiDungId',
+            'tenDangNhap',
+            'muoi',
+            'matKhauHash',
+            'vaiTro',
+            'trangThai',
+          ],
+          {
+            nguoiDungId: id,
+            tenDangNhap: dto.tenDangNhap ?? nguoiDung.maNguoiDung.toLowerCase(),
+            muoi,
+            matKhauHash: hashMatKhau(muoi, dto.matKhau),
+            vaiTro,
+            trangThai: TrangThaiTaiKhoan.HOAT_DONG,
+          },
+        ),
+      );
+      return this.layTaiKhoanPublic(id, tx);
     });
+  }
+
+  private async layNguoiDung(id: bigint, db: SqlExecutor = this.db) {
+    const row = await db.queryOne('SELECT * FROM nguoi_dung WHERE id = ?', [
+      id,
+    ]);
+    return row && camelize<{ loaiNguoiDung: string; maNguoiDung: string }>(row);
+  }
+
+  private async layTaiKhoanPublic(nguoiDungId: bigint, db: SqlExecutor) {
+    const row = await db.queryOne(
+      `SELECT ${TAI_KHOAN_PUBLIC} FROM tai_khoan WHERE nguoi_dung_id = ?`,
+      [nguoiDungId],
+    );
+    return row && camelize(row);
   }
 }
