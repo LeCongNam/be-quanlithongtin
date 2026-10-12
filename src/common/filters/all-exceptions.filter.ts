@@ -4,6 +4,11 @@ import {
   ExceptionFilter,
   HttpException,
 } from '@nestjs/common';
+import {
+  DatabaseError,
+  mapDbError,
+  RecordNotFoundError,
+} from '../../database/db-error.js';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -16,10 +21,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     console.error(exception);
 
-    const statusCode =
-      exception instanceof HttpException ? exception.getStatus() : 500;
-    const exceptionBody =
-      exception instanceof HttpException
+    // Lỗi CSDL (gồm SIGNAL nghiệp vụ của procedure -> 422) đổi mã HTTP như DatabaseExceptionFilter
+    const dbError =
+      exception instanceof DatabaseError ||
+      exception instanceof RecordNotFoundError
+        ? mapDbError(exception)
+        : undefined;
+    const statusCode = dbError
+      ? dbError.status
+      : exception instanceof HttpException
+        ? exception.getStatus()
+        : 500;
+    const exceptionBody = dbError
+      ? { message: dbError.message }
+      : exception instanceof HttpException
         ? this.getHttpExceptionResponse(exception)
         : { message: 'Internal server error' };
     const path = request.url.split('?')[0];
