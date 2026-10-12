@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { isStaff, resolveMaNguoiDung } from '../common/auth-helpers.js';
 import type { AuthUser } from '../common/decorators/current-user.decorator.js';
 import { paginate, skipTake } from '../common/dto/page-query.dto.js';
@@ -45,18 +45,14 @@ export class DatTruocService {
   constructor(private readonly db: DbService) {}
 
   async datTruoc(dto: TaoDatTruocDto, user: AuthUser) {
-    try {
-      const maNguoiDung = resolveMaNguoiDung(user, dto.maNguoiDung);
-      await this.db.call('sp_dat_truoc', [maNguoiDung, dto.maSach]);
-      const row = await this.db.queryOne(
-        sql`${raw(SELECT_DAT_TRUOC)}
+    const maNguoiDung = resolveMaNguoiDung(user, dto.maNguoiDung);
+    await this.db.call('sp_dat_truoc', [maNguoiDung, dto.maSach]);
+    const row = await this.db.queryOne(
+      sql`${raw(SELECT_DAT_TRUOC)}
           WHERE s.ma_sach = ${dto.maSach} AND nd.ma_nguoi_dung = ${maNguoiDung}
           ORDER BY dt.id DESC LIMIT 1`,
-      );
-      return row ? toDatTruoc(row) : null;
-    } catch (err) {
-      throw new HttpException(err as any, HttpStatus.BAD_REQUEST);
-    }
+    );
+    return row ? toDatTruoc(row) : null;
   }
 
   async huyDatTruoc(
