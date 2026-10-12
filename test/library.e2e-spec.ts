@@ -9,6 +9,9 @@ import '../src/common/bigint-json.js';
  * Chạy trên DB thật (docker compose up -d db) với dữ liệu seed trong sql/02_seed.sql.
  * Mỗi lần chạy tự tạo dữ liệu mới với mã duy nhất nên chạy lại nhiều lần được;
  * dữ liệu test không bị dọn (phiếu mượn/phạt có khóa ngoại). Muốn DB sạch: docker compose down -v && up.
+ * Chỉ chạy trên DB local: test/setup-db-guard.ts từ chối DATABASE_URL trỏ ra ngoài (trừ khi E2E_ALLOW_REMOTE_DB=1).
+ * Các spec gọi app.listen(0, '127.0.0.1') thay vì app.init(): supertest tự listen(0) sẽ bind "*", và trên máy dev
+ * thỉnh thoảng trùng cổng với tiến trình khác nghe trên 127.0.0.1 (request bị trả lời bởi tiến trình lạ: 404/403/socket hang up).
  */
 const ADMIN = {
   tenDangNhap: process.env.E2E_ADMIN_USER ?? 'ad001',
@@ -53,7 +56,7 @@ describe('Library API (e2e)', () => {
     app.useGlobalPipes(
       new ValidationPipe({ transform: true, whitelist: true }),
     );
-    await app.init();
+    await app.listen(0, '127.0.0.1');
     http = request(app.getHttpServer());
     admin = await login(ADMIN.tenDangNhap, ADMIN.matKhau);
     thuThu = await login(THU_THU.tenDangNhap, THU_THU.matKhau);

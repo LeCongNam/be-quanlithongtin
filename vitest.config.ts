@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
@@ -9,5 +9,7 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['**/*.spec.ts'],
+    // E2E ghi vào CSDL thật nên chỉ chạy qua vitest.config.e2e.ts (có guard và chạy tuần tự).
+    exclude: [...configDefaults.exclude, '**/*.e2e-spec.ts'],
   },
 });

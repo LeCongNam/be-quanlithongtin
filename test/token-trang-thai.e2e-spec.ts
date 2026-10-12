@@ -60,7 +60,7 @@ describe('Token và trạng thái tài khoản (e2e)', () => {
     app.useGlobalPipes(
       new ValidationPipe({ transform: true, whitelist: true }),
     );
-    await app.init();
+    await app.listen(0, '127.0.0.1');
     http = request(app.getHttpServer());
     admin = await login('ad001', 'AD001@Nhom8');
     thuThu = await login('cb001', 'CB001@Nhom8');
@@ -79,7 +79,10 @@ describe('Token và trạng thái tài khoản (e2e)', () => {
       .set(auth(admin))
       .send({ trangThai: 'KHOA' })
       .expect(200);
-    await http.get('/auth/me').set(auth(token)).expect(401);
+    const biKhoa = await http.get('/auth/me').set(auth(token)).expect(401);
+    expect(biKhoa.body.message).toBe(
+      'Tài khoản đang bị khóa hoặc ngừng hoạt động',
+    );
     await http.get('/me/sach-dang-muon').set(auth(token)).expect(401);
 
     await http

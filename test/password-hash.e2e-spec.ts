@@ -85,7 +85,7 @@ describe('Băm mật khẩu thống nhất với sp_dang_nhap (e2e)', () => {
     app.useGlobalPipes(
       new ValidationPipe({ transform: true, whitelist: true }),
     );
-    await app.init();
+    await app.listen(0, '127.0.0.1');
     http = request(app.getHttpServer());
     db = app.get(DbService);
     const res = await dangNhapWeb('ad001', 'AD001@Nhom8').expect(200);
