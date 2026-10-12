@@ -48,7 +48,7 @@ export class AuthService {
       taiKhoan.nguoi_dung_trang_thai !== TrangThaiNguoiDung.HOAT_DONG
     ) {
       throw new UnauthorizedException(
-        'Tai khoan dang bi khoa hoac ngung hoat dong',
+        'Tài khoản đang bị khóa hoặc ngừng hoạt động',
       );
     }
 

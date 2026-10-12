@@ -7,5 +7,8 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['**/*.e2e-spec.ts'],
+    setupFiles: ['./test/setup-db-guard.ts'],
+    // Các spec dùng chung một CSDL thật nên không chạy song song giữa các file.
+    fileParallelism: false,
   },
 });

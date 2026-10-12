@@ -53,7 +53,7 @@ describe('Xóa danh mục chỉ dành cho ADMIN (e2e)', () => {
     app.useGlobalPipes(
       new ValidationPipe({ transform: true, whitelist: true }),
     );
-    await app.init();
+    await app.listen(0, '127.0.0.1');
     http = request(app.getHttpServer());
     admin = await login('ad001', 'AD001@Nhom8');
     thuThu = await login('cb001', 'CB001@Nhom8');
